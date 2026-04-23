@@ -1,0 +1,312 @@
+@font-face {
+	font-family: 'Google Sans';
+	src: url('/fonts/Google_Sans/GoogleSans-Regular.ttf') format('truetype');
+	font-weight: 400;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Google Sans';
+	src: url('/fonts/Google_Sans/GoogleSans-Medium.ttf') format('truetype');
+	font-weight: 500;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Google Sans';
+	src: url('/fonts/Google_Sans/GoogleSans-SemiBold.ttf') format('truetype');
+	font-weight: 600;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Google Sans Code';
+	src: url('/fonts/Google_Sans_Code/GoogleSansCode-Regular.ttf') format('truetype');
+	font-weight: 400;
+	font-style: normal;
+}
+
+:root {
+	color-scheme: light;
+	--docs-bg: #f3eee6;
+	--docs-shell: rgba(243, 238, 230, 0.95);
+	--docs-surface: #ebe3d5;
+	--docs-surface-strong: #faf5ec;
+	--docs-surface-raised: #fffaf2;
+	--docs-code-bg: #f7f1e7;
+	--docs-code-header: #ece3d5;
+	--docs-text: #161311;
+	--docs-text-soft: #3a332d;
+	--docs-text-muted: #675e52;
+	--docs-border: rgba(82, 68, 52, 0.18);
+	--docs-border-strong: rgba(82, 68, 52, 0.34);
+	--docs-accent: #0f5d57;
+	--docs-accent-strong: #073f3b;
+	--docs-accent-soft: rgba(15, 93, 87, 0.1);
+	--docs-warning: #9d6217;
+	--docs-danger: #ae4c23;
+	--docs-shadow-soft: none;
+	--docs-code-comment: #7f735f;
+	--docs-code-keyword: #0d5f62;
+	--docs-code-string: #7a4d1e;
+	--docs-code-number: #85325b;
+	--docs-code-function: #1d5691;
+	--docs-code-operator: #49433e;
+	--docs-code-punctuation: #72695e;
+	--docs-font-sans: 'Google Sans', system-ui, sans-serif;
+	--docs-font-mono: 'Google Sans Code', ui-monospace, monospace;
+	--docs-sidebar-width: 17.5rem;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+	--docs-bg: #121516;
+	--docs-shell: rgba(18, 21, 22, 0.95);
+	--docs-surface: #1a1f21;
+	--docs-surface-strong: #202729;
+	--docs-surface-raised: #262f32;
+	--docs-code-bg: #15191b;
+	--docs-code-header: #1d2427;
+	--docs-text: #edf2ee;
+	--docs-text-soft: #d5ddd7;
+	--docs-text-muted: #98a59c;
+	--docs-border: rgba(191, 209, 201, 0.16);
+	--docs-border-strong: rgba(191, 209, 201, 0.32);
+	--docs-accent: #93d1c1;
+	--docs-accent-strong: #d5f5ed;
+	--docs-accent-soft: rgba(147, 209, 193, 0.12);
+	--docs-warning: #e7b371;
+	--docs-danger: #e38861;
+	--docs-shadow-soft: none;
+	--docs-code-comment: #7d8b82;
+	--docs-code-keyword: #7dd7d3;
+	--docs-code-string: #efc18f;
+	--docs-code-number: #efa0c7;
+	--docs-code-function: #8eb8fb;
+	--docs-code-operator: #c9d3cd;
+	--docs-code-punctuation: #a3b1aa;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-padding-top: 1rem;
+	background: var(--docs-bg);
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--docs-accent) 6%, transparent), transparent 12rem),
+		linear-gradient(90deg, color-mix(in srgb, var(--docs-border) 28%, transparent) 1px, transparent 1px),
+		var(--docs-bg);
+	color: var(--docs-text);
+	font-family: var(--docs-font-sans);
+	font-size: 15px;
+	line-height: 1.68;
+	text-rendering: optimizeLegibility;
+	background-size: auto, 24px 24px, auto;
+}
+
+a {
+	color: var(--docs-accent);
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.16em;
+}
+
+a:hover {
+	color: var(--docs-text);
+}
+
+p,
+ul,
+ol,
+table,
+figure,
+pre {
+	margin: 0;
+}
+
+ul,
+ol {
+	padding-left: 1.2rem;
+}
+
+li + li {
+	margin-top: 0.45rem;
+}
+
+code,
+kbd {
+	font-family: var(--docs-font-mono);
+	font-size: 0.9em;
+}
+
+code {
+	background: color-mix(in srgb, var(--docs-surface) 88%, transparent);
+	border: 1px solid var(--docs-border);
+	padding: 0.12rem 0.3rem;
+	border-radius: 0;
+}
+
+kbd {
+	background: var(--docs-surface);
+	border: 1px solid var(--docs-border);
+	padding: 0.12rem 0.36rem;
+	border-radius: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	margin: 0;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--docs-text);
+}
+
+h2 {
+	font-size: 1.34rem;
+	letter-spacing: -0.02em;
+}
+
+h3 {
+	font-size: 1.08rem;
+	letter-spacing: -0.01em;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+th,
+td {
+	padding: 0.8rem 0;
+	text-align: left;
+	vertical-align: top;
+	border-bottom: 1px solid var(--docs-border);
+}
+
+th {
+	font-size: 0.83rem;
+	font-weight: 500;
+	color: var(--docs-text);
+}
+
+td {
+	color: var(--docs-text-soft);
+}
+
+td code {
+	background: transparent;
+	padding: 0;
+}
+
+.doc-page {
+	display: flex;
+	flex-direction: column;
+	gap: 2.2rem;
+}
+
+.doc-page section,
+.doc-page article {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+}
+
+.doc-page p,
+.doc-page li {
+	color: var(--docs-text-soft);
+}
+
+.doc-page strong {
+	color: var(--docs-text);
+}
+
+.doc-page .doc-lead {
+	font-size: 1.08rem;
+	line-height: 1.78;
+	color: var(--docs-text);
+}
+
+.doc-page .doc-meta {
+	font-size: 0.9rem;
+	color: var(--docs-text-muted);
+}
+
+::selection {
+	background: color-mix(in srgb, var(--docs-accent) 24%, transparent);
+	color: var(--docs-text);
+}
+
+.code-block .token.comment,
+.code-block .token.prolog,
+.code-block .token.doctype,
+.code-block .token.cdata {
+	color: var(--docs-code-comment);
+}
+
+.code-block .token.punctuation {
+	color: var(--docs-code-punctuation);
+}
+
+.code-block .token.namespace {
+	opacity: 0.8;
+}
+
+.code-block .token.property,
+.code-block .token.tag,
+.code-block .token.boolean,
+.code-block .token.constant,
+.code-block .token.symbol,
+.code-block .token.deleted {
+	color: var(--docs-code-number);
+}
+
+.code-block .token.number,
+.code-block .token.attr-name,
+.code-block .token.builtin,
+.code-block .token.inserted {
+	color: var(--docs-code-number);
+}
+
+.code-block .token.selector,
+.code-block .token.string,
+.code-block .token.char,
+.code-block .token.attr-value {
+	color: var(--docs-code-string);
+}
+
+.code-block .token.operator,
+.code-block .token.entity,
+.code-block .token.url,
+.code-block .language-css .token.string,
+.code-block .style .token.string {
+	color: var(--docs-code-operator);
+}
+
+.code-block .token.atrule,
+.code-block .token.keyword {
+	color: var(--docs-code-keyword);
+}
+
+.code-block .token.function,
+.code-block .token.class-name {
+	color: var(--docs-code-function);
+}
+
+@media (max-width: 900px) {
+	body {
+		font-size: 14px;
+	}
+}

@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible bug in MCS.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Node version, browser
+      placeholder: "macOS 15.x, Node 22.x, Chrome 12x"
+    validations:
+      required: false
+

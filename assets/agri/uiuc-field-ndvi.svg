@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+  <!--
+    Synthetic NDVI overlay for the research farmland bounds used by the
+    Agriculture example. Color ramp follows a standard NDVI palette
+    (bare soil/stressed -> yellow -> healthy canopy). Stress zones A/B/C
+    coincide with the plugin's stress zones (agri-ndvi-mission-plugin.ts).
+    Colors are saturated so the overlay reads clearly on top of satellite tiles.
+  -->
+  <defs>
+    <!-- NDVI base palette: saturated greens so the overlay pops on satellite. -->
+    <linearGradient id="ndviBase" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#12823a" />
+      <stop offset="35%"  stop-color="#2fb04a" />
+      <stop offset="70%"  stop-color="#8ed24e" />
+      <stop offset="100%" stop-color="#56b747" />
+    </linearGradient>
+
+    <!-- Subtle east/west moisture gradient (western sweep slightly more vigorous). -->
+    <linearGradient id="ndviShade" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#0a5d2a" stop-opacity="0.28" />
+      <stop offset="55%"  stop-color="#0a5d2a" stop-opacity="0" />
+      <stop offset="100%" stop-color="#b97c26" stop-opacity="0.16" />
+    </linearGradient>
+
+    <!-- Zone A (low vigor terrace): center deep brown fading through orange. -->
+    <radialGradient id="zoneA" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#5c2612" stop-opacity="0.98" />
+      <stop offset="25%"  stop-color="#a14822" stop-opacity="0.94" />
+      <stop offset="52%"  stop-color="#e28a2a" stop-opacity="0.78" />
+      <stop offset="80%"  stop-color="#f0c557" stop-opacity="0.32" />
+      <stop offset="100%" stop-color="#f0c557" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Zone B (irrigation shadow): slightly deeper stress, elongated. -->
+    <radialGradient id="zoneB" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#4a1d0e" stop-opacity="0.98" />
+      <stop offset="25%"  stop-color="#933820" stop-opacity="0.95" />
+      <stop offset="52%"  stop-color="#d97322" stop-opacity="0.82" />
+      <stop offset="80%"  stop-color="#edb847" stop-opacity="0.34" />
+      <stop offset="100%" stop-color="#edb847" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Zone C (drainage/compaction): shallower stress, mostly orange. -->
+    <radialGradient id="zoneC" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#8a3a1c" stop-opacity="0.92" />
+      <stop offset="38%"  stop-color="#d57628" stop-opacity="0.8" />
+      <stop offset="72%"  stop-color="#ecba4d" stop-opacity="0.34" />
+      <stop offset="100%" stop-color="#ecba4d" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Row crop pattern: slight diagonal furrows. -->
+    <pattern id="rows" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(-12 500 500)">
+      <rect width="26" height="26" fill="transparent" />
+      <path d="M0 7 H26 M0 19 H26" stroke="#08260f" stroke-opacity="0.18" stroke-width="1.5" />
+    </pattern>
+
+    <!-- Plot boundaries: faint rectangular field divisions. -->
+    <pattern id="plots" width="250" height="200" patternUnits="userSpaceOnUse">
+      <rect width="250" height="200" fill="none" stroke="#f5f8d4" stroke-opacity="0.12" stroke-width="1.5" />
+    </pattern>
+
+    <!-- Subtle organic noise via turbulence so the field does not look flat. -->
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="11" />
+      <feColorMatrix type="matrix" values="0 0 0 0 0.05  0 0 0 0 0.14  0 0 0 0 0.03  0 0 0 0.22 0" />
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="1000" fill="url(#ndviBase)" />
+  <rect x="0" y="0" width="1000" height="1000" fill="url(#ndviShade)" />
+  <rect x="0" y="0" width="1000" height="1000" fill="url(#plots)" />
+  <rect x="0" y="0" width="1000" height="1000" fill="url(#rows)" />
+  <rect x="0" y="0" width="1000" height="1000" filter="url(#grain)" opacity="0.55" />
+
+  <!-- Zone A: x=0.69, y=0.36, rx=0.12, ry=0.10 -->
+  <ellipse cx="690" cy="360" rx="160" ry="135" fill="url(#zoneA)" />
+
+  <!-- Zone B: x=0.34, y=0.72, rx=0.14, ry=0.12 -->
+  <ellipse cx="340" cy="720" rx="185" ry="160" fill="url(#zoneB)" />
+
+  <!-- Zone C: x=0.81, y=0.79, rx=0.10, ry=0.09 -->
+  <ellipse cx="810" cy="790" rx="135" ry="120" fill="url(#zoneC)" />
+
+  <!-- Nitrogen-richer strips for visual interest. -->
+  <ellipse cx="170" cy="210" rx="140" ry="110" fill="#0c6a2d" opacity="0.24" />
+  <ellipse cx="520" cy="500" rx="210" ry="150" fill="#15853c" opacity="0.2" />
+</svg>

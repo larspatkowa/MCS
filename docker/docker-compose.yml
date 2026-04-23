@@ -1,0 +1,10 @@
+services:
+  mcs:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "6000:3000"
+    volumes:
+      - ../mcs/data:/app/data
+

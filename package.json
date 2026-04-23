@@ -1,0 +1,7 @@
+{
+  "name": "mcs-monorepo",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "workspaces": ["mcs", "docs-site"]
+}

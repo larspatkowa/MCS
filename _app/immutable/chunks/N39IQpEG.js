@@ -1,0 +1,1 @@
+import{o,n as u,H as _,q as t,C as g,r as i,t as l,v as n,x as p,y as v}from"./WLiAnBBQ.js";function E(r,d){let s=null,y=t;var a;if(t){s=p;for(var e=v(document.head);e!==null&&(e.nodeType!==g||e.data!==r);)e=i(e);if(e===null)l(!1);else{var f=i(e);e.remove(),n(f)}}t||(a=document.head.appendChild(o()));try{u(()=>d(a),_)}finally{y&&(l(!0),n(s))}}export{E as h};

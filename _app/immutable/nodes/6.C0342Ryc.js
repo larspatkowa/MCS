@@ -1,0 +1,1 @@
+import{r as e}from"../chunks/CifRVE5c.js";import{a as o}from"../chunks/BqUi0RrF.js";const a=({params:t})=>{const r=o(t.type);throw r?e(302,`/gallery/${r.typeId}/${r.variantId}`):e(302,"/gallery")},n=Object.freeze(Object.defineProperty({__proto__:null,load:a},Symbol.toStringTag,{value:"Module"}));export{n as universal};

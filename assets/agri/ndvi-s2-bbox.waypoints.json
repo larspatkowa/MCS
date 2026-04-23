@@ -1,0 +1,1116 @@
+{
+  "bbox": {
+    "west": -93.678317,
+    "south": 41.979554,
+    "east": -93.658764,
+    "north": 41.993814
+  },
+  "epsg": 32615,
+  "threshold": 0.45,
+  "waypoints": [
+    {
+      "lat": 41.993867686451495,
+      "lon": -93.66146790362566,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.99386976275407,
+      "lon": -93.66110747845659,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.99387183792512,
+      "lon": -93.6607470532496,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.99387391196464,
+      "lon": -93.6603866280047,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.99387598487263,
+      "lon": -93.66002620272192,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.99387805664909,
+      "lon": -93.65966577740126,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.990643450053966,
+      "lon": -93.66323666277549,
+      "label": "",
+      "detail": "NDVI 0.45",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98902192746359,
+      "lon": -93.665742765201,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98902401699319,
+      "lon": -93.66538236767967,
+      "label": "",
+      "detail": "NDVI 0.48",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98902610539147,
+      "lon": -93.66502197012018,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98849046560428,
+      "lon": -93.66501639497653,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98875828550421,
+      "lon": -93.66501918252943,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.988488377245005,
+      "lon": -93.66537678951524,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.988756197125454,
+      "lon": -93.66537957857852,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98848628775443,
+      "lon": -93.66573718401575,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98875410761536,
+      "lon": -93.66573997458943,
+      "label": "",
+      "detail": "NDVI 0.48",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98842307697936,
+      "lon": -93.67654900118302,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98798808503501,
+      "lon": -93.65924455052387,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.987163871728406,
+      "lon": -93.66284013505744,
+      "label": "",
+      "detail": "NDVI 0.48",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98716179025419,
+      "lon": -93.66320052227299,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98689188759474,
+      "lon": -93.66355812816575,
+      "label": "",
+      "detail": "NDVI 0.48",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98715970764872,
+      "lon": -93.66356090945048,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986889803877474,
+      "lon": -93.66391851379491,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98715762391199,
+      "lon": -93.66392129658993,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98688771902895,
+      "lon": -93.664278899386,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.987155539044,
+      "lon": -93.6642816836913,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986885633049184,
+      "lon": -93.66463928493901,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98715345304473,
+      "lon": -93.66464207075457,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98688354593815,
+      "lon": -93.6649996704539,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.987151365914244,
+      "lon": -93.6650024577797,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9868814576959,
+      "lon": -93.66536005593062,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.987149277652456,
+      "lon": -93.66536284476673,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986879368322384,
+      "lon": -93.6657204413692,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98714718825945,
+      "lon": -93.66572323171557,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98687727781762,
+      "lon": -93.66608082676959,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.987145097735166,
+      "lon": -93.66608361862625,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986875186181614,
+      "lon": -93.66644121213179,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98714300607962,
+      "lon": -93.66644400549872,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98687309341437,
+      "lon": -93.66680159745577,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98714091329283,
+      "lon": -93.66680439233296,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98687099951587,
+      "lon": -93.66716198274149,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.987138819374785,
+      "lon": -93.66716477912897,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98686890448612,
+      "lon": -93.66752236798897,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98713672432548,
+      "lon": -93.6675251658867,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98686680832513,
+      "lon": -93.66788275319816,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98713462814492,
+      "lon": -93.66788555260615,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9868647110329,
+      "lon": -93.66824313836904,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98713253083311,
+      "lon": -93.6682459392873,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986596891220024,
+      "lon": -93.6682403374888,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98632907139445,
+      "lon": -93.66823753664657,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98606125155617,
+      "lon": -93.66823473584238,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98659898849267,
+      "lon": -93.66787995382816,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98633116864752,
+      "lon": -93.66787715449615,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986063348789656,
+      "lon": -93.66787435520216,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98660108463408,
+      "lon": -93.66751957012922,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98633326476936,
+      "lon": -93.66751677230745,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98606544489191,
+      "lon": -93.66751397452366,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986603179644256,
+      "lon": -93.667159186392,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98633535975996,
+      "lon": -93.66715639008045,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98606753986298,
+      "lon": -93.66715359380687,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9866052735232,
+      "lon": -93.66679880261651,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986337453619356,
+      "lon": -93.66679600781521,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986069633702805,
+      "lon": -93.66679321305183,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98660736627091,
+      "lon": -93.6664384188028,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98633954634752,
+      "lon": -93.66643562551171,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98607172641143,
+      "lon": -93.66643283225855,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986609457887376,
+      "lon": -93.66607803495084,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98634163794447,
+      "lon": -93.66607524317,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986073817988846,
+      "lon": -93.66607245142704,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986611548372615,
+      "lon": -93.6657176510607,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98634372841018,
+      "lon": -93.66571486079008,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98607590843504,
+      "lon": -93.66571207055733,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986613637726634,
+      "lon": -93.66535726713236,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98634581774467,
+      "lon": -93.665354478372,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986077997750016,
+      "lon": -93.66535168964946,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98661572594939,
+      "lon": -93.66499688316588,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98634790594794,
+      "lon": -93.66499409591573,
+      "label": "",
+      "detail": "NDVI 0.57",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986080085933786,
+      "lon": -93.66499130870342,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98661781304091,
+      "lon": -93.66463649916126,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98634999301997,
+      "lon": -93.66463371342134,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98608217298633,
+      "lon": -93.66463092771923,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98661989900121,
+      "lon": -93.66427611511853,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98635207896078,
+      "lon": -93.66427333088883,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98608425890767,
+      "lon": -93.66427054669694,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98662198383025,
+      "lon": -93.66391573103769,
+      "label": "",
+      "detail": "NDVI 0.48",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.986086343697785,
+      "lon": -93.66391016563655,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98636872576308,
+      "lon": -93.66139026925903,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98637080152284,
+      "lon": -93.66102988638441,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98555278713454,
+      "lon": -93.66354422230843,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985820607251966,
+      "lon": -93.66354700340439,
+      "label": "",
+      "detail": "NDVI 0.48",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98555070351454,
+      "lon": -93.66390460038653,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9858185236125,
+      "lon": -93.66390738299265,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98554861876337,
+      "lon": -93.66426497842654,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98581643884187,
+      "lon": -93.66426776254285,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98554653288098,
+      "lon": -93.66462535642849,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98581435294002,
+      "lon": -93.66462814205495,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985544445867426,
+      "lon": -93.66498573439229,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98581226590696,
+      "lon": -93.66498852152894,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98554235772266,
+      "lon": -93.66534611231798,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985810177742685,
+      "lon": -93.66534890096479,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9855402684467,
+      "lon": -93.66570649020551,
+      "label": "",
+      "detail": "NDVI 0.56",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98580808844722,
+      "lon": -93.66570928036249,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98553817803955,
+      "lon": -93.66606686805486,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98580599802054,
+      "lon": -93.666069659722,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9855360865012,
+      "lon": -93.666427245866,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98580390646267,
+      "lon": -93.6664300390433,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98553399383165,
+      "lon": -93.66678762363892,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985801813773584,
+      "lon": -93.6667904183264,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985531900030935,
+      "lon": -93.66714800137362,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985799719953306,
+      "lon": -93.66715079757128,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985529805099006,
+      "lon": -93.66750837907004,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985797625001815,
+      "lon": -93.66751117677786,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98552770903588,
+      "lon": -93.6678687567282,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98579552891912,
+      "lon": -93.66787155594618,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98552561184157,
+      "lon": -93.66822913434805,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98579343170523,
+      "lon": -93.6682319350762,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98525779196523,
+      "lon": -93.66822633365791,
+      "label": "",
+      "detail": "NDVI 0.50",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9849899720762,
+      "lon": -93.66822353300581,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985259889139954,
+      "lon": -93.6678659575482,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.984992069231346,
+      "lon": -93.66786315840622,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.9852619851835,
+      "lon": -93.6675055814002,
+      "label": "",
+      "detail": "NDVI 0.53",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98499416525531,
+      "lon": -93.66750278376834,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98526408009585,
+      "lon": -93.66714520521393,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98526617387703,
+      "lon": -93.66678482898938,
+      "label": "",
+      "detail": "NDVI 0.51",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98526826652704,
+      "lon": -93.6664244527266,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985000446540205,
+      "lon": -93.66642165962513,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98527035804586,
+      "lon": -93.6660640764256,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985272448433484,
+      "lon": -93.66570370008641,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985004628407594,
+      "lon": -93.66570091000519,
+      "label": "",
+      "detail": "NDVI 0.47",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98527453768993,
+      "lon": -93.66534332370902,
+      "label": "",
+      "detail": "NDVI 0.55",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98527662581519,
+      "lon": -93.6649829472935,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.985278712809276,
+      "lon": -93.66462257083984,
+      "label": "",
+      "detail": "NDVI 0.56",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98528079867217,
+      "lon": -93.66426219434805,
+      "label": "",
+      "detail": "NDVI 0.54",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98528288340389,
+      "lon": -93.66390181781819,
+      "label": "",
+      "detail": "NDVI 0.52",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98528496700442,
+      "lon": -93.66354144125025,
+      "label": "",
+      "detail": "NDVI 0.49",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98528913081191,
+      "lon": -93.66282068800021,
+      "label": "",
+      "detail": "NDVI 0.45",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.984496059660714,
+      "lon": -93.66101049297465,
+      "label": "",
+      "detail": "NDVI 0.46",
+      "color": "#64748b",
+      "markerSize": 4
+    },
+    {
+      "lat": 41.98449398403664,
+      "lon": -93.66137086527819,
+      "label": "",
+      "detail": "NDVI 0.48",
+      "color": "#64748b",
+      "markerSize": 4
+    }
+  ]
+}

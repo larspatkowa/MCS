@@ -1,0 +1,31 @@
+*.log
+*.tgz
+
+# macOS
+.DS_Store
+.!*.DS_Store
+
+# Node
+node_modules
+
+# Editor
+**/.vscode/
+
+# Cursor / local tooling
+.cursor
+.playwright-mcp
+
+# SvelteKit/Vite
+**/.svelte-kit
+**/.vite
+**/dist
+**/build
+
+# Local data (projects/config)
+data
+mcs/data
+
+# Local outputs
+output
+docs-site/test-results
+

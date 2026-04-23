@@ -1,0 +1,13 @@
+**/node_modules
+**/.svelte-kit
+**/.vite
+**/dist
+**/build
+**/.DS_Store
+docs-site
+output
+.cursor
+.playwright-mcp
+packages
+*.tgz
+
