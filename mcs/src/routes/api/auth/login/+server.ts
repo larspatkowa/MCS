@@ -13,8 +13,28 @@ type Failures = { count: number; resetAt: number };
 const addressFailures = new Map<string, Failures>();
 const accountFailures = new Map<string, Failures>();
 const addressesInFlight = new Set<string>();
-/** Tail of each account's attempt queue; attempts on one account run in turn. */
-const accountQueues = new Map<string, Promise<void>>();
+const accountsInFlight = new Set<string>();
+/** Addresses that signed in to an account recently skip that account's throttle. */
+const knownAddresses = new Map<string, Map<string, number>>();
+const KNOWN_ADDRESS_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_KNOWN_PER_ACCOUNT = 20;
+
+function isKnownAddress(account: string, address: string, now: number): boolean {
+	return (knownAddresses.get(account)?.get(address) ?? 0) > now;
+}
+
+function rememberAddress(account: string, address: string, now: number): void {
+	let addresses = knownAddresses.get(account);
+	if (!addresses) {
+		if (knownAddresses.size >= MAX_TRACKED)
+			knownAddresses.delete(knownAddresses.keys().next().value!);
+		addresses = new Map();
+		knownAddresses.set(account, addresses);
+	}
+	addresses.delete(address);
+	addresses.set(address, now + KNOWN_ADDRESS_MS);
+	if (addresses.size > MAX_KNOWN_PER_ACCOUNT) addresses.delete(addresses.keys().next().value!);
+}
 
 function current(table: Map<string, Failures>, key: string, now: number): number {
 	const entry = table.get(key);
@@ -53,8 +73,11 @@ function forgiveOne(table: Map<string, Failures>, key: string): void {
  *   An address has one attempt in flight at a time and is refused after
  *   repeated failures.
  * - An account is never locked, because anyone could then lock out its owner.
- *   Attempts on one account run one at a time, each after a delay that grows
- *   with recent failures (up to 30 s), which caps guessing per account.
+ *   From an unfamiliar address, one attempt per account runs at a time (others
+ *   get 429 at once, nothing queues) after a delay that grows with recent
+ *   failures, up to 30 s. That caps guessing per account.
+ * - An address that signed in to the account in the last 30 days skips the
+ *   account throttle, so an attacker elsewhere cannot slow the owner down.
  */
 export const POST: RequestHandler = async ({ request, cookies, url, getClientAddress }) => {
 	try {
@@ -74,15 +97,19 @@ export const POST: RequestHandler = async ({ request, cookies, url, getClientAdd
 		addressesInFlight.add(addressKey);
 		recordFailure(addressFailures, addressKey, now);
 
-		const previous = accountQueues.get(accountKey) ?? Promise.resolve();
-		let release!: () => void;
-		const turn = new Promise<void>((done) => (release = done));
-		const tail = previous.then(() => turn);
-		accountQueues.set(accountKey, tail);
+		const known = isKnownAddress(accountKey, addressKey, now);
+		if (!known && accountsInFlight.has(accountKey)) {
+			addressesInFlight.delete(addressKey);
+			forgiveOne(addressFailures, addressKey);
+			return json(
+				{ error: 'Another sign-in to this account is in progress. Try again shortly.' },
+				{ status: 429 }
+			);
+		}
+		if (!known) accountsInFlight.add(accountKey);
 		let session: ReturnType<typeof login>;
 		try {
-			await previous;
-			const failures = current(accountFailures, accountKey, Date.now());
+			const failures = known ? 0 : current(accountFailures, accountKey, now);
 			if (failures >= 3) {
 				const delay = Math.min(MAX_ACCOUNT_DELAY_MS, 250 * 2 ** (failures - 3));
 				await new Promise((done) => setTimeout(done, delay));
@@ -91,12 +118,12 @@ export const POST: RequestHandler = async ({ request, cookies, url, getClientAdd
 			if (session) {
 				forgiveOne(addressFailures, addressKey);
 				accountFailures.delete(accountKey);
+				rememberAddress(accountKey, addressKey, Date.now());
 			} else {
 				recordFailure(accountFailures, accountKey, Date.now());
 			}
 		} finally {
-			release();
-			if (accountQueues.get(accountKey) === tail) accountQueues.delete(accountKey);
+			if (!known) accountsInFlight.delete(accountKey);
 			addressesInFlight.delete(addressKey);
 		}
 		if (!session) return json({ error: 'Email or password is incorrect' }, { status: 401 });
