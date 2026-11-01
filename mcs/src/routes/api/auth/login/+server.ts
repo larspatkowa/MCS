@@ -7,11 +7,14 @@ import { readJsonObject } from '$lib/server/ingest-validation.js';
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ADDRESS_FAILURES = 8;
 const MAX_TRACKED = 10_000;
-const MAX_ACCOUNT_DELAY_MS = 5_000;
+const MAX_ACCOUNT_DELAY_MS = 30_000;
 
 type Failures = { count: number; resetAt: number };
 const addressFailures = new Map<string, Failures>();
 const accountFailures = new Map<string, Failures>();
+const addressesInFlight = new Set<string>();
+/** Tail of each account's attempt queue; attempts on one account run in turn. */
+const accountQueues = new Map<string, Promise<void>>();
 
 function current(table: Map<string, Failures>, key: string, now: number): number {
 	const entry = table.get(key);
@@ -38,12 +41,20 @@ function recordFailure(table: Map<string, Failures>, key: string, now: number): 
 	table.set(key, next);
 }
 
+function forgiveOne(table: Map<string, Failures>, key: string): void {
+	const entry = table.get(key);
+	if (entry && entry.count > 0) entry.count -= 1;
+}
+
 /**
  * Throttling:
- * - An address with too many failures is refused for the window.
+ * - Every attempt is charged to its address before any waiting, and given
+ *   back only on success, so parallel requests cannot all pass the check.
+ *   An address has one attempt in flight at a time and is refused after
+ *   repeated failures.
  * - An account is never locked, because anyone could then lock out its owner.
- *   Repeated failures for an account instead slow every attempt on it by a
- *   growing delay (capped at a few seconds), which rate-limits guessing.
+ *   Attempts on one account run one at a time, each after a delay that grows
+ *   with recent failures (up to 30 s), which caps guessing per account.
  */
 export const POST: RequestHandler = async ({ request, cookies, url, getClientAddress }) => {
 	try {
@@ -53,30 +64,48 @@ export const POST: RequestHandler = async ({ request, cookies, url, getClientAdd
 		}
 		const addressKey = getClientAddress();
 		const accountKey = body.email.trim().toLowerCase();
-		let now = Date.now();
-		if (current(addressFailures, addressKey, now) >= MAX_ADDRESS_FAILURES) {
+		const now = Date.now();
+		if (
+			current(addressFailures, addressKey, now) >= MAX_ADDRESS_FAILURES ||
+			addressesInFlight.has(addressKey)
+		) {
 			return json({ error: 'Too many sign-in attempts. Try again later.' }, { status: 429 });
 		}
-		const accountCount = current(accountFailures, accountKey, now);
-		if (accountCount >= 3) {
-			const delay = Math.min(MAX_ACCOUNT_DELAY_MS, 250 * 2 ** (accountCount - 3));
-			await new Promise((done) => setTimeout(done, delay));
-			now = Date.now();
+		addressesInFlight.add(addressKey);
+		recordFailure(addressFailures, addressKey, now);
+
+		const previous = accountQueues.get(accountKey) ?? Promise.resolve();
+		let release!: () => void;
+		const turn = new Promise<void>((done) => (release = done));
+		const tail = previous.then(() => turn);
+		accountQueues.set(accountKey, tail);
+		let session: ReturnType<typeof login>;
+		try {
+			await previous;
+			const failures = current(accountFailures, accountKey, Date.now());
+			if (failures >= 3) {
+				const delay = Math.min(MAX_ACCOUNT_DELAY_MS, 250 * 2 ** (failures - 3));
+				await new Promise((done) => setTimeout(done, delay));
+			}
+			session = login(body.email, body.password);
+			if (session) {
+				forgiveOne(addressFailures, addressKey);
+				accountFailures.delete(accountKey);
+			} else {
+				recordFailure(accountFailures, accountKey, Date.now());
+			}
+		} finally {
+			release();
+			if (accountQueues.get(accountKey) === tail) accountQueues.delete(accountKey);
+			addressesInFlight.delete(addressKey);
 		}
-		const session = login(body.email, body.password);
-		if (!session) {
-			recordFailure(addressFailures, addressKey, now);
-			recordFailure(accountFailures, accountKey, now);
-			return json({ error: 'Email or password is incorrect' }, { status: 401 });
-		}
-		addressFailures.delete(addressKey);
-		accountFailures.delete(accountKey);
+		if (!session) return json({ error: 'Email or password is incorrect' }, { status: 401 });
 		cookies.set('mcs_session', session.token, {
 			path: '/',
 			httpOnly: true,
 			sameSite: 'strict',
 			secure: secureAuthCookie(url.href),
-			maxAge: session.expiresAt - Math.floor(now / 1000)
+			maxAge: session.expiresAt - Math.floor(Date.now() / 1000)
 		});
 		return json({ user: session.user });
 	} catch (error) {

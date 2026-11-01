@@ -29,6 +29,16 @@ describe('renderMarkdown', () => {
 		// A smuggled placeholder cannot pull a code block into an attribute.
 		const smuggled = renderMarkdown('```js\nq\n```\n[x](\x00CODE0\x00)');
 		expect(smuggled).not.toMatch(/href="[^"]*<pre/);
+		// Nested image inside a link, and a fenced block inside link text.
+		for (const source of [
+			'[![a](https://x.example/i.png)](https://y.example)',
+			'[```\nq\n```](https://y.example/d.pdf)'
+		]) {
+			const html = renderMarkdown(source);
+			for (const [, value] of html.matchAll(/(?:href|src|title|alt)="([^"]*)"/g)) {
+				expect(value, source).not.toMatch(/[<>\x00]/);
+			}
+		}
 	});
 
 	it('keeps web, mail and relative links and renders images', () => {

@@ -42,19 +42,24 @@ export function renderMarkdown(src: string): string {
 		inlineLinks.push(html);
 		return `\x00LINK${inlineLinks.length - 1}\x00`;
 	};
-	src = src
-		.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, (_match, alt: string, url: string) =>
-			hold(`<img src="${safeUrl(url)}" alt="${alt}" style="max-width:100%" />`)
-		)
-		.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_match, text: string, rawUrl: string) => {
+	// One pass for both, so an image is never replaced first and then
+	// wrapped by a link. A match that contains a placeholder (a code block
+	// inside the brackets) is left as text: placeholders must never reach an
+	// attribute.
+	src = src.replace(
+		/(!?)\[([^\]\n]*)\]\(([^)\s]+)\)/g,
+		(match, bang: string, text: string, rawUrl: string) => {
+			if (match.includes('\x00') || (!bang && !text)) return match;
 			const url = safeUrl(rawUrl);
+			if (bang) return hold(`<img src="${url}" alt="${text}" style="max-width:100%" />`);
 			if (/\.pdf(?:[?#].*)?$/i.test(url)) {
 				return hold(
 					`<div class="md-pdf"><iframe src="${url}" title="${text}"></iframe><a class="md-file-link" href="${url}" target="_blank" rel="noopener noreferrer">${text}</a></div>`
 				);
 			}
 			return hold(`<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`);
-		});
+		}
+	);
 
 	// GFM tables
 	const tableRegex = /^(\|.+\|)\n(\|[\s:|-]+\|)\n((?:\|.+\|\n?)+)/gm;
