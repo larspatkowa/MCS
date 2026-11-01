@@ -23,6 +23,8 @@ function safeUrl(url: string): string {
  * markup is added, so a note can never inject elements or attributes.
  */
 export function renderMarkdown(src: string): string {
+	// NUL delimits placeholders below, so it may not appear in the source.
+	src = src.replace(/\x00/g, '');
 	// Pre-process: extract fenced code blocks to prevent interference
 	const codeBlocks: string[] = [];
 	src = src.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
@@ -31,6 +33,28 @@ export function renderMarkdown(src: string): string {
 	});
 
 	src = escapeHtml(src);
+
+	// Links and images become placeholders right after escaping, so no later
+	// pass (emphasis, inline code, line breaks) can rewrite text inside an
+	// attribute. Their text is shown as plain escaped text.
+	const inlineLinks: string[] = [];
+	const hold = (html: string) => {
+		inlineLinks.push(html);
+		return `\x00LINK${inlineLinks.length - 1}\x00`;
+	};
+	src = src
+		.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, (_match, alt: string, url: string) =>
+			hold(`<img src="${safeUrl(url)}" alt="${alt}" style="max-width:100%" />`)
+		)
+		.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_match, text: string, rawUrl: string) => {
+			const url = safeUrl(rawUrl);
+			if (/\.pdf(?:[?#].*)?$/i.test(url)) {
+				return hold(
+					`<div class="md-pdf"><iframe src="${url}" title="${text}"></iframe><a class="md-file-link" href="${url}" target="_blank" rel="noopener noreferrer">${text}</a></div>`
+				);
+			}
+			return hold(`<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`);
+		});
 
 	// GFM tables
 	const tableRegex = /^(\|.+\|)\n(\|[\s:|-]+\|)\n((?:\|.+\|\n?)+)/gm;
@@ -85,20 +109,6 @@ export function renderMarkdown(src: string): string {
 		.replace(/^\d+\. (.+)$/gm, '<oli>$1</oli>')
 		// unordered list items
 		.replace(/^[-*+] (.+)$/gm, '<li>$1</li>')
-		// images, before links so the link pattern does not consume them
-		.replace(
-			/!\[([^\]]*)\]\(([^)]+)\)/g,
-			(_match, alt: string, url: string) =>
-				`<img src="${safeUrl(url)}" alt="${alt}" style="max-width:100%" />`
-		)
-		// links / PDFs
-		.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text: string, rawUrl: string) => {
-			const url = safeUrl(rawUrl);
-			if (/\.pdf(?:[?#].*)?$/i.test(url)) {
-				return `<div class="md-pdf"><iframe src="${url}" title="${text || 'PDF document'}"></iframe><a class="md-file-link" href="${url}" target="_blank" rel="noopener">${text || 'Open PDF'}</a></div>`;
-			}
-			return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
-		})
 		// paragraphs (double newline)
 		.replace(/\n\n/g, '</p><p>')
 		// single newline → <br>
@@ -112,7 +122,8 @@ export function renderMarkdown(src: string): string {
 		.replace(/<\/ol>\s*<ol>/g, '')
 		.replace(/<\/?oli>/g, '');
 
-	// Restore fenced code blocks
+	// Restore links, then fenced code blocks
+	html = html.replace(/\x00LINK(\d+)\x00/g, (_, i) => inlineLinks[Number(i)]);
 	html = html.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[Number(i)]);
 
 	return '<p>' + html + '</p>';

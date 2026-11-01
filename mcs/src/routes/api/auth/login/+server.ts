@@ -4,52 +4,73 @@ import { login, secureAuthCookie } from '$lib/server/auth.js';
 import { handleApiError } from '$lib/server/errors.js';
 import { readJsonObject } from '$lib/server/ingest-validation.js';
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPTS = 8;
+const MAX_ADDRESS_FAILURES = 8;
 const MAX_TRACKED = 10_000;
+const MAX_ACCOUNT_DELAY_MS = 5_000;
 
-function isLocked(key: string, now: number): boolean {
-	const attempt = attempts.get(key);
-	return Boolean(attempt && attempt.resetAt > now && attempt.count >= MAX_ATTEMPTS);
+type Failures = { count: number; resetAt: number };
+const addressFailures = new Map<string, Failures>();
+const accountFailures = new Map<string, Failures>();
+
+function current(table: Map<string, Failures>, key: string, now: number): number {
+	const entry = table.get(key);
+	return entry && entry.resetAt > now ? entry.count : 0;
 }
 
-function recordFailure(key: string, now: number): void {
-	if (!attempts.has(key) && attempts.size >= MAX_TRACKED) {
-		// Drop expired entries first; if none, the oldest. Keeps memory bounded.
-		for (const [candidate, attempt] of attempts) {
-			if (attempt.resetAt <= now) attempts.delete(candidate);
+function recordFailure(table: Map<string, Failures>, key: string, now: number): void {
+	if (!table.has(key) && table.size >= MAX_TRACKED) {
+		// Evict expired entries, then the least-failed one, so an attacker
+		// cannot flush a throttled address by filling the table.
+		for (const [candidate, entry] of table) if (entry.resetAt <= now) table.delete(candidate);
+		if (table.size >= MAX_TRACKED) {
+			let weakest: string | null = null;
+			let fewest = Infinity;
+			for (const [candidate, entry] of table) {
+				if (entry.count < fewest) [weakest, fewest] = [candidate, entry.count];
+			}
+			if (weakest) table.delete(weakest);
 		}
-		if (attempts.size >= MAX_TRACKED) attempts.delete(attempts.keys().next().value!);
 	}
-	const attempt = attempts.get(key);
-	const next = attempt && attempt.resetAt > now ? attempt : { count: 0, resetAt: now + WINDOW_MS };
+	const entry = table.get(key);
+	const next = entry && entry.resetAt > now ? entry : { count: 0, resetAt: now + WINDOW_MS };
 	next.count += 1;
-	attempts.set(key, next);
+	table.set(key, next);
 }
 
+/**
+ * Throttling:
+ * - An address with too many failures is refused for the window.
+ * - An account is never locked, because anyone could then lock out its owner.
+ *   Repeated failures for an account instead slow every attempt on it by a
+ *   growing delay (capped at a few seconds), which rate-limits guessing.
+ */
 export const POST: RequestHandler = async ({ request, cookies, url, getClientAddress }) => {
 	try {
 		const body = await readJsonObject(request);
 		if (typeof body.email !== 'string' || typeof body.password !== 'string') {
 			return json({ error: 'Email and password are required' }, { status: 400 });
 		}
-		// Throttle by address and by account, so rotating addresses cannot
-		// keep guessing one password.
-		const addressKey = `ip:${getClientAddress()}`;
-		const accountKey = `account:${body.email.trim().toLowerCase()}`;
-		const now = Date.now();
-		if (isLocked(addressKey, now) || isLocked(accountKey, now)) {
+		const addressKey = getClientAddress();
+		const accountKey = body.email.trim().toLowerCase();
+		let now = Date.now();
+		if (current(addressFailures, addressKey, now) >= MAX_ADDRESS_FAILURES) {
 			return json({ error: 'Too many sign-in attempts. Try again later.' }, { status: 429 });
+		}
+		const accountCount = current(accountFailures, accountKey, now);
+		if (accountCount >= 3) {
+			const delay = Math.min(MAX_ACCOUNT_DELAY_MS, 250 * 2 ** (accountCount - 3));
+			await new Promise((done) => setTimeout(done, delay));
+			now = Date.now();
 		}
 		const session = login(body.email, body.password);
 		if (!session) {
-			recordFailure(addressKey, now);
-			recordFailure(accountKey, now);
+			recordFailure(addressFailures, addressKey, now);
+			recordFailure(accountFailures, accountKey, now);
 			return json({ error: 'Email or password is incorrect' }, { status: 401 });
 		}
-		attempts.delete(addressKey);
-		attempts.delete(accountKey);
+		addressFailures.delete(addressKey);
+		accountFailures.delete(accountKey);
 		cookies.set('mcs_session', session.token, {
 			path: '/',
 			httpOnly: true,

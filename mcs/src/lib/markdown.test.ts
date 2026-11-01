@@ -22,6 +22,13 @@ describe('renderMarkdown', () => {
 		const breakout = renderMarkdown('[x](https://a.example/" onmouseover="alert(1))');
 		expect(breakout).not.toContain('" onmouseover="');
 		expect(renderMarkdown('```\n<b>\n```')).toContain('&lt;b&gt;');
+		// Formatting passes must not reach inside attributes.
+		expect(renderMarkdown('[x](https://a.example/*b*/`c`)')).toContain(
+			'href="https://a.example/*b*/`c`"'
+		);
+		// A smuggled placeholder cannot pull a code block into an attribute.
+		const smuggled = renderMarkdown('```js\nq\n```\n[x](\x00CODE0\x00)');
+		expect(smuggled).not.toMatch(/href="[^"]*<pre/);
 	});
 
 	it('keeps web, mail and relative links and renders images', () => {
