@@ -1,12 +1,12 @@
 <script lang="ts">
 	import TimelineStrip from '../timeline/TimelineStrip.svelte';
 	import TimeConductor from '../timeline/TimeConductor.svelte';
+	import RunControls from './RunControls.svelte';
+	import SourceStatus from './SourceStatus.svelte';
 	import { currentProject } from '$lib/stores/project';
 	import { userSettings, getEffectiveDateTimeOptions } from '$lib/stores/settings';
 	import { formatDateTime } from '$lib/date-time-format';
 	import { timeConductorState } from '$lib/stores/timeline';
-	import { unackedCount } from '$lib/stores/notifications';
-	import { Bell } from '@lucide/svelte';
 
 	let now = $state(new Date());
 	$effect(() => {
@@ -15,7 +15,11 @@
 	});
 
 	const effectiveOptions = $derived(
-		getEffectiveDateTimeOptions($userSettings, $currentProject?.settings?.dateTime)
+		// Mission time is UTC everywhere telemetry is shown, matching plots and tables.
+		{
+			...getEffectiveDateTimeOptions($userSettings, $currentProject?.settings?.dateTime),
+			utc: true
+		}
 	);
 
 	const formattedDateTime = $derived(formatDateTime(now, effectiveOptions));
@@ -30,17 +34,10 @@
 			{/if}
 			{formattedDateTime}
 		</span>
-		{#if $unackedCount > 0}
-			<span
-				class="notif-badge"
-				title="{$unackedCount} unacknowledged alert{$unackedCount === 1 ? '' : 's'}"
-			>
-				<Bell size={11} />
-				{$unackedCount > 99 ? '99+' : $unackedCount}
-			</span>
-		{/if}
 		{#if $currentProject}
+			<RunControls />
 			<TimeConductor />
+			<SourceStatus />
 		{/if}
 	</div>
 	<div class="timeline-wrap">
@@ -66,11 +63,17 @@
 		align-items: center;
 		gap: 0.5rem 0.8rem;
 		min-width: 0;
-		overflow-x: auto;
-		scrollbar-width: none;
+		overflow: visible;
 	}
-	.bottom-bar-meta::-webkit-scrollbar {
-		display: none;
+	@media (max-width: 1300px) {
+		.bottom-bar {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0.2rem;
+		}
+		.bottom-bar-meta {
+			flex-wrap: wrap;
+			overflow-x: visible;
+		}
 	}
 	.time {
 		flex-shrink: 0;
@@ -98,21 +101,6 @@
 		50% {
 			opacity: 0.3;
 		}
-	}
-	.notif-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.2rem;
-		padding: 0.12rem 0.35rem;
-		background: #ef444420;
-		border: 1px solid #ef4444;
-		color: #ef4444;
-		border-radius: var(--mcs-radius);
-		font-size: 0.65rem;
-		font-family: var(--mcs-font-mono);
-		font-weight: 600;
-		flex-shrink: 0;
-		white-space: nowrap;
 	}
 	.timeline-wrap {
 		display: flex;

@@ -5,8 +5,12 @@
 		description?: string;
 	}
 
-	let { title, badge, description }: Props = $props();
+let { title, badge, description }: Props = $props();
 </script>
+
+<svelte:head>
+	<meta name="description" content={description ?? 'MCS documentation.'} />
+</svelte:head>
 
 <header class="page-header">
 	{#if badge}
@@ -40,6 +44,7 @@
 		width: fit-content;
 		padding: 0.2rem 0.5rem;
 		border: 1px solid var(--docs-border);
+		border-radius: var(--docs-radius);
 		font-size: 0.76rem;
 		font-family: var(--docs-font-mono);
 		letter-spacing: 0.04em;

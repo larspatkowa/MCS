@@ -11,14 +11,12 @@
     Ingest["performIngest()"]
     SQLite[("SQLite")]
     SSE["SSE broadcasts"]
-    Plugins["Plugin system (Data sources UI)"]
-    External["External process"]
+	Adapter["External acquisition adapter"]
 
     UI --> REST
     REST --> Projects
     REST --> Ingest
-    Plugins --> Ingest
-    External -->|"POST /api/ingest"| REST
+	Adapter -->|"POST /api/ingest"| REST
     Projects --> SQLite
     Ingest --> SQLite
     Ingest --> SSE
@@ -31,14 +29,14 @@
 
 <PageHeader
 	title="Architecture"
-	description="The main runtime path in MCS is browser UI to REST routes to SQLite and SSE. Simulations and connectors (Data sources in the UI) use the plugin registry: they either call the same ingest path directly or reach it over HTTP."
+	description="The main runtime path in MCS is browser UI to REST routes to SQLite and SSE. External acquisition systems send normalized samples or import run packages through narrow data boundaries."
 />
 
 <article class="doc-page">
 	<section>
 		<MermaidDiagram
 			diagram={architectureDiagram}
-			caption="Validated against the current REST routes, ingest core, plugin registry, and SSE endpoints."
+			caption="Validated against the current REST routes, ingest core, run import, and SSE endpoints."
 		/>
 	</section>
 
@@ -57,7 +55,7 @@
 		<h2>Server</h2>
 		<p>
 			Server modules under <code>mcs/src/lib/server</code> handle project manifests, SQLite access,
-			stream metadata, annotations, limits, and plugin execution. The API routes are thin wrappers
+			stream metadata, annotations, limits, run storage, and media. The API routes are thin wrappers
 			over those modules.
 		</p>
 	</section>
@@ -72,15 +70,15 @@
 	</section>
 
 	<section>
-		<h2>Data sources (plugin path)</h2>
+		<h2>External acquisition</h2>
 		<p>
-			In-process simulations receive a <code>ctx.ingest()</code> callback. External connectors are started
-			as Node or Python processes and receive <code>MCS_API_URL</code> and <code>MCS_PROJECT_ID</code>
-			in their environment so they can call the same HTTP API.
+			MCS does not execute supplier code. An external acquisition adapter declares streams, sends
+			normalized timestamped samples, imports run packages, or registers timestamped media through
+			the documented data routes.
 		</p>
-		<Callout type="info" title="Two SSE channels">
-			Project structure changes come from <code>/api/projects/:id/changes</code>. Telemetry samples
-			and limit events come from <code>/api/projects/:id/streams/events</code>.
+		<Callout type="info" title="Stream event feed">
+			Telemetry samples and limit events come from <code>/api/projects/:id/streams/events</code>.
+			Project structure reads and writes use the object routes directly.
 		</Callout>
 	</section>
 

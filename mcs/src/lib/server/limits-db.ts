@@ -17,6 +17,7 @@ export type LimitSeverity = 'yellow' | 'red';
 
 export interface LimitEvent {
 	id: string;
+	runId: string | null;
 	streamId: string;
 	field: string;
 	ts: number;
@@ -111,6 +112,7 @@ export function deleteLimitConfig(projectPath: string, streamId: string, field: 
 
 interface LimitEventRow {
 	id: string;
+	run_id: string | null;
 	stream_id: string;
 	field: string;
 	ts: number;
@@ -124,6 +126,7 @@ interface LimitEventRow {
 function rowToEvent(row: LimitEventRow): LimitEvent {
 	return {
 		id: row.id,
+		runId: row.run_id,
 		streamId: row.stream_id,
 		field: row.field,
 		ts: row.ts,
@@ -153,7 +156,7 @@ export function listLimitEvents(
 	}
 	const rows = db
 		.prepare(
-			`SELECT id, stream_id, field, ts, value, severity, label, acked_at, created_at
+			`SELECT id, run_id, stream_id, field, ts, value, severity, label, acked_at, created_at
 			 FROM limit_events WHERE ${clauses.join(' AND ')} ORDER BY ts DESC`
 		)
 		.all(...params) as LimitEventRow[];
@@ -162,16 +165,28 @@ export function listLimitEvents(
 
 export function createLimitEvent(
 	projectPath: string,
-	event: Omit<LimitEvent, 'id' | 'ackedAt' | 'createdAt'>
+	event: Omit<LimitEvent, 'id' | 'ackedAt' | 'createdAt' | 'runId'> & {
+		runId?: string | null;
+	}
 ): LimitEvent {
 	const db = getDb(projectPath);
 	const id = randomUUID();
 	const now = new Date().toISOString();
 	db.prepare(
-		`INSERT INTO limit_events (id, stream_id, field, ts, value, severity, label, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	).run(id, event.streamId, event.field, event.ts, event.value, event.severity, event.label, now);
-	return { ...event, id, ackedAt: null, createdAt: now };
+		`INSERT INTO limit_events (id, run_id, stream_id, field, ts, value, severity, label, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	).run(
+		id,
+		event.runId ?? null,
+		event.streamId,
+		event.field,
+		event.ts,
+		event.value,
+		event.severity,
+		event.label,
+		now
+	);
+	return { ...event, runId: event.runId ?? null, id, ackedAt: null, createdAt: now };
 }
 
 export function ackLimitEvent(projectPath: string, id: string): boolean {
@@ -234,6 +249,7 @@ export function evaluateLimits(
 /** In-memory dedup: last event time per (projectPath+streamId+field+severity). */
 const lastEventTime = new Map<string, number>();
 const COOLDOWN_SEC = 30;
+const MAX_COOLDOWN_KEYS = 4_096;
 
 export function shouldEmitLimitEvent(
 	projectPath: string,
@@ -245,6 +261,10 @@ export function shouldEmitLimitEvent(
 	const key = `${projectPath}:${streamId}:${field}:${severity}`;
 	const last = lastEventTime.get(key) ?? 0;
 	if (ts - last < COOLDOWN_SEC) return false;
+	if (lastEventTime.size >= MAX_COOLDOWN_KEYS && !lastEventTime.has(key)) {
+		const oldest = lastEventTime.keys().next().value;
+		if (oldest) lastEventTime.delete(oldest);
+	}
 	lastEventTime.set(key, ts);
 	return true;
 }

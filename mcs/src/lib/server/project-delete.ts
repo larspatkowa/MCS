@@ -1,11 +1,9 @@
-import { join, resolve, sep } from 'path';
+import { resolve, sep } from 'path';
 import { rmSync } from 'fs';
 import { removeRecentProject } from '$lib/server/config';
+import { getManagedProjectsDir } from '$lib/server/config';
 import { forgetProjectIdCache, getProjectPathById } from '$lib/server/project';
-import { stopInProcessForProject } from '$lib/server/plugin-registry';
-import { stopPluginsForProject } from '$lib/server/plugin-runner';
-
-const SAFE_PROJECTS_BASE = join(process.cwd(), 'data', 'projects');
+import { closeProjectDb } from '$lib/server/db';
 
 export type ProjectDeleteOutcome = { ok: true } | { ok: false; error: string; statusCode: number };
 
@@ -21,7 +19,7 @@ export function deleteProjectById(id: string, deleteFolder: boolean): ProjectDel
 
 	if (deleteFolder) {
 		const resolvedPath = resolve(projectPath);
-		const safeBase = resolve(SAFE_PROJECTS_BASE);
+		const safeBase = resolve(getManagedProjectsDir());
 		if (resolvedPath !== safeBase && !resolvedPath.startsWith(safeBase + sep)) {
 			return {
 				ok: false,
@@ -31,20 +29,12 @@ export function deleteProjectById(id: string, deleteFolder: boolean): ProjectDel
 		}
 	}
 
-	removeRecentProject(projectPath);
-
-	// Ensure any running plugins tied to this project are stopped before we drop the cache
-	// and/or delete the folder, to avoid background ingest errors and log spam.
-	try {
-		stopInProcessForProject(id);
-		stopPluginsForProject(id);
-	} catch {
-		// best-effort
-	}
+	closeProjectDb(projectPath);
 
 	forgetProjectIdCache(id);
 
 	if (!deleteFolder) {
+		removeRecentProject(projectPath);
 		return { ok: true };
 	}
 
@@ -59,5 +49,6 @@ export function deleteProjectById(id: string, deleteFolder: boolean): ProjectDel
 			};
 		}
 	}
+	removeRecentProject(projectPath);
 	return { ok: true };
 }

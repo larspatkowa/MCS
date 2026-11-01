@@ -57,6 +57,7 @@
 		color: var(--docs-text);
 		background: color-mix(in srgb, var(--docs-surface-strong) 78%, transparent);
 		border: 1px solid var(--docs-border);
+		border-radius: var(--docs-radius);
 		transition:
 			border-color 160ms ease,
 			background-color 160ms ease;

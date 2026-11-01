@@ -5,10 +5,7 @@ async function ensureProjectId(request: APIRequestContext): Promise<string | nul
 	const now = Date.now();
 	const nonce = Math.random().toString(16).slice(2, 8);
 	const createRes = await request.post('/api/projects', {
-		data: {
-			name: `E2E Fullscreen ${now}-${nonce}`,
-			path: `./data/projects/e2e-fullscreen-${now}-${nonce}`
-		}
+		data: { name: `E2E Fullscreen ${now}-${nonce}` }
 	});
 	if (createRes.ok()) {
 		const created = (await createRes.json()) as { id?: string };

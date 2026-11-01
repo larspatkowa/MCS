@@ -69,7 +69,7 @@ export function streamDataToRows(
 }
 
 /**
- * Build exportable rows from chart series data (LinePlot, OverlayPlot, etc.)
+ * Build exportable rows from chart series data.
  */
 export function seriesToRows(
 	series: Array<{ name: string; data: Array<{ x: Date | number; y: number }> }>

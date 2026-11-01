@@ -4,7 +4,7 @@
 	import Callout from '$lib/components/Callout.svelte';
 	import { docTitle } from '$lib/nav.js';
 
-	const declareStreams = `curl -X POST http://localhost:6000/api/projects/YOUR_PROJECT_ID/streams/declare \\
+	const declareStreams = `curl -X POST http://127.0.0.1:8080/api/projects/YOUR_PROJECT_ID/streams/declare \\
   -H "Content-Type: application/json" \\
   -d '{
     "streams": [
@@ -25,7 +25,7 @@
     ]
   }'`;
 
-	const updateLimits = `curl -X PUT http://localhost:6000/api/projects/YOUR_PROJECT_ID/streams/weather%3Atemperature/limits \\
+	const updateLimits = `curl -X PUT http://127.0.0.1:8080/api/projects/YOUR_PROJECT_ID/streams/weather%3Atemperature/limits \\
   -H "Content-Type: application/json" \\
   -d '{
     "field": "value",

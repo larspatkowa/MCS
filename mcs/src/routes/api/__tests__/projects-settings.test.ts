@@ -57,7 +57,7 @@ describe('API /api/projects/[id] settings persistence', () => {
 		}
 	});
 
-	it('PATCH persists autoStartPlugins alongside dateTime settings', async () => {
+	it('PATCH persists dateTime settings', async () => {
 		const { GET, PATCH } = await import('../projects/[id]/+server');
 
 		const patchResponse = await PATCH(
@@ -65,10 +65,7 @@ describe('API /api/projects/[id] settings persistence', () => {
 				`http://localhost/api/projects/${projectId}`,
 				'PATCH',
 				{
-					settings: {
-						autoStartPlugins: ['agri-ndvi-mission'],
-						dateTime: { dateFormat: 'YYYY-MM-DD', timeFormat: 'HH:mm:ss' }
-					}
+					settings: { dateTime: { dateFormat: 'YYYY-MM-DD', timeFormat: 'HH:mm:ss' } }
 				},
 				{ id: projectId }
 			)
@@ -76,7 +73,6 @@ describe('API /api/projects/[id] settings persistence', () => {
 
 		expect(patchResponse.status).toBe(200);
 		const patched = await patchResponse.json();
-		expect(patched.settings.autoStartPlugins).toEqual(['agri-ndvi-mission']);
 		expect(patched.settings.dateTime).toEqual({
 			dateFormat: 'YYYY-MM-DD',
 			timeFormat: 'HH:mm:ss'
@@ -87,7 +83,6 @@ describe('API /api/projects/[id] settings persistence', () => {
 		);
 		expect(getResponse.status).toBe(200);
 		const project = await getResponse.json();
-		expect(project.settings.autoStartPlugins).toEqual(['agri-ndvi-mission']);
 		expect(project.settings.dateTime).toEqual({
 			dateFormat: 'YYYY-MM-DD',
 			timeFormat: 'HH:mm:ss'

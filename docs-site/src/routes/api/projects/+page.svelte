@@ -3,29 +3,28 @@
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import { docTitle } from '$lib/nav.js';
 
-	const createProject = `curl -X POST http://localhost:6000/api/projects \\
+	const createProject = `curl -X POST http://127.0.0.1:8080/api/projects \\
   -H "Content-Type: application/json" \\
   -d '{
-    "name": "Flight Readiness Demo",
+    "name": "Telemetry Project",
     "path": "/absolute/path/to/project-folder",
     "notes": "Created from the API"
   }'`;
 
-	const patchProject = `curl -X PATCH http://localhost:6000/api/projects/YOUR_PROJECT_ID \\
+	const patchProject = `curl -X PATCH http://127.0.0.1:8080/api/projects/YOUR_PROJECT_ID \\
   -H "Content-Type: application/json" \\
   -d '{
     "name": "Updated name",
     "settings": {
-      "autoStartPlugins": ["system-sensor"],
       "dateTime": { "dateFormat": "iso", "timeFormat": "24h" }
     }
   }'`;
 
-	const deleteProject = `curl -X DELETE http://localhost:6000/api/projects/YOUR_PROJECT_ID \\
+	const deleteProject = `curl -X DELETE http://127.0.0.1:8080/api/projects/YOUR_PROJECT_ID \\
   -H "Content-Type: application/json" \\
   -d '{ "deleteFolder": true }'`;
 
-	const batchDelete = `curl -X POST http://localhost:6000/api/projects/batch-delete \\
+	const batchDelete = `curl -X POST http://127.0.0.1:8080/api/projects/batch-delete \\
   -H "Content-Type: application/json" \\
   -d '{
     "ids": ["PROJECT_ID_1", "PROJECT_ID_2"],
@@ -39,7 +38,7 @@
 
 <PageHeader
 	title="Projects API"
-	description="Project routes list recent projects, create manifests and databases, update project settings, and stream tree-change notifications."
+	description="Project routes list recent projects, create project folders, update settings, and control membership and deletion."
 />
 
 <article class="doc-page">
@@ -56,7 +55,6 @@
 				<tr><td><code>PATCH /api/projects/:id</code></td><td>Update <code>name</code>, <code>notes</code>, or <code>settings</code>.</td></tr>
 				<tr><td><code>DELETE /api/projects/:id</code></td><td>Remove from recents, optionally delete the project folder.</td></tr>
 				<tr><td><code>POST /api/projects/batch-delete</code></td><td>Remove or delete many projects by id. Returns per-id results; status <code>207</code> if any entry failed.</td></tr>
-				<tr><td><code>GET /api/projects/:id/changes</code></td><td>SSE stream for tree and object changes.</td></tr>
 			</tbody>
 		</table>
 	</section>
@@ -74,8 +72,7 @@
 		<h2>Update settings</h2>
 		<CodeBlock lang="bash" title="Update a project" code={patchProject} />
 		<p>
-			Date/time settings are merged into the existing project settings. <code>autoStartPlugins</code>
-			is rewritten as a deduplicated string array.
+			Date/time settings are merged into the existing project settings.
 		</p>
 	</section>
 

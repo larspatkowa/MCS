@@ -175,7 +175,6 @@
 	async function handleDelete(node: ObjectTreeNode) {
 		const proj = $currentProject;
 		if (!proj || node.type === 'project') return;
-		if (false) return;
 		const res = await fetch(`/api/projects/${proj.id}/objects/${node.id}`, { method: 'DELETE' });
 		if (!res.ok) return;
 		if ($selectedObjectId === node.id) {
@@ -188,7 +187,6 @@
 	async function handleReorder(draggedId: string, parentId: string, insertBeforeId: string | null) {
 		const proj = $currentProject;
 		if (!proj || !tree) return;
-		if (false) return;
 		const parent = findNodeById(tree, parentId);
 		if (!parent?.children?.length) return;
 		const siblingIds = parent.children.map((c) => c.id);

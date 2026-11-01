@@ -7,7 +7,7 @@
 	let sidebarEl: HTMLDivElement | undefined = $state();
 </script>
 
-<div class="sidebar-left" bind:this={sidebarEl} data-sidebar-left data-tutorial="sidebar-tree">
+<div class="sidebar-left" bind:this={sidebarEl} data-sidebar-left>
 	<div class="section-title">
 		<span class="section-title-start">
 			<button

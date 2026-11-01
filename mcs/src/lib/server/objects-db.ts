@@ -2,14 +2,14 @@ import { randomUUID } from 'crypto';
 import { getDb } from './db.js';
 import type { ObjectTreeNode } from '$lib/objects';
 import { rowToObject, type ObjectRow } from '$lib/objects';
+import { BadRequestError } from './errors.js';
 
 type ObjectFromRow = ReturnType<typeof rowToObject>;
 
 export function getObjectTree(projectPath: string): ObjectTreeNode | null {
 	const db = getDb(projectPath);
 	const root = db.prepare('SELECT * FROM objects WHERE parent_id IS NULL LIMIT 1').get() as
-		| ObjectRow
-		| undefined;
+		ObjectRow | undefined;
 	if (!root) return null;
 	return buildTree(db, rowToObject(root));
 }
@@ -28,8 +28,7 @@ export function getObject(
 ): (ObjectFromRow & { parentId?: string }) | null {
 	const db = getDb(projectPath);
 	const row = db.prepare('SELECT * FROM objects WHERE id = ?').get(objectId) as
-		| ObjectRow
-		| undefined;
+		ObjectRow | undefined;
 	if (!row) return null;
 	const obj = rowToObject(row);
 	return { ...obj, parentId: row.parent_id ?? undefined };
@@ -119,13 +118,15 @@ export function reorderChildren(projectPath: string, parentId: string, childIds:
 		.all(parentId) as { id: string }[];
 	const existingIds = new Set(existing.map((r) => r.id));
 	if (childIds.length !== existingIds.size || childIds.some((id) => !existingIds.has(id))) {
-		throw new Error('childIds must match current children');
+		throw new BadRequestError('childIds must match current children');
 	}
 	const now = new Date().toISOString();
 	const stmt = db.prepare('UPDATE objects SET sort_order = ?, updated_at = ? WHERE id = ?');
-	childIds.forEach((id, index) => {
-		stmt.run(index, now, id);
-	});
+	db.transaction(() => {
+		childIds.forEach((id, index) => {
+			stmt.run(index, now, id);
+		});
+	})();
 }
 
 /**

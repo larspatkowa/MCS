@@ -10,6 +10,7 @@
 	} from '$lib/stores/project';
 	import { isDraggingObject } from '$lib/stores/drag.js';
 	import { sidebarRightVisible } from '$lib/stores/sidebars';
+	import { renderContext } from '$lib/stores/render-context.js';
 	import type { GridLayoutProps, GridLayoutItem } from '$lib/objects/types.js';
 	function uuid() {
 		return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -38,6 +39,23 @@
 	const DEFAULT_CANVAS_H = 600;
 
 	const scaleToFit = $derived(layoutProps.scaleToFit ?? false);
+	const backgroundMode = $derived(layoutProps.backgroundMode ?? 'theme');
+	const backgroundColor = $derived(layoutProps.backgroundColor ?? '#202020');
+	const showGrid = $derived(
+		layoutProps.showGrid !== false && (!$renderContext.active || $renderContext.showChrome)
+	);
+	const showChrome = $derived(
+		layoutProps.showChrome !== false && (!$renderContext.active || $renderContext.showChrome)
+	);
+	const canvasBackground = $derived(
+		backgroundMode === 'transparent' || ($renderContext.active && $renderContext.transparent)
+			? 'transparent'
+			: backgroundMode === 'solid'
+				? backgroundColor
+				: $renderContext.active
+					? $renderContext.background
+					: 'var(--mcs-surface-alt)'
+	);
 
 	const hasExplicitDimensions = $derived(
 		(dimensions as [number, number] | undefined)?.[0] != null &&
@@ -88,8 +106,7 @@
 		patchTimeout = setTimeout(() => {
 			patchTimeout = null;
 			const proj = $currentProject;
-			if (!proj || proj.id === 'gallery') return;
-			if (false) return;
+			if (!proj) return;
 			const sel = get(selectedObject);
 			const body: { props: GridLayoutProps; expectedUpdatedAt?: string } = { props: layoutProps };
 			if (sel && sel.id === objectId) body.expectedUpdatedAt = sel.updatedAt;
@@ -284,6 +301,7 @@
 <div
 	class="grid-layout-fit"
 	class:grid-layout-has-dimensions={scaleToFit}
+	style:background={canvasBackground}
 	bind:this={fitContainer}
 	role="region"
 	aria-label="Grid layout"
@@ -295,7 +313,7 @@
 		<ContextMenu.Root>
 			<ContextMenu.Trigger
 				class="grid-layout-view grid-layout-view-fixed {$gridLayoutEditMode ? 'editing' : ''}"
-				style="width: {effectiveDimensions[0]}px; height: {effectiveDimensions[1]}px; transform: scale({scale}); transform-origin: 0 0;"
+				style="width: {effectiveDimensions[0]}px; height: {effectiveDimensions[1]}px; transform: scale({scale}); transform-origin: 0 0; background: {canvasBackground};"
 				role="region"
 				aria-label={items.length === 0
 					? $gridLayoutEditMode
@@ -317,7 +335,8 @@
 					{#if items.length > 0 || $gridLayoutEditMode}
 						<div
 							class="grid-background"
-							style="background-size: {gridSize[0]}px {gridSize[1]}px; background-image: linear-gradient(to right, var(--mcs-border) 1px, transparent 1px), linear-gradient(to bottom, var(--mcs-border) 1px, transparent 1px);"
+							style:display={showGrid ? 'block' : 'none'}
+							style="background-color: {canvasBackground};"
 						></div>
 					{/if}
 					{#each items as item}
@@ -331,6 +350,7 @@
 								$selectedLayoutContext.itemId === item.id}
 							isInspected={$inspectedLayoutObject?.layoutObjectId === objectId &&
 								$inspectedLayoutObject?.objectId === item.objectId}
+							{showChrome}
 							onMove={handleMove}
 							onResize={handleResize}
 							onSelectObject={handleSelectObject}

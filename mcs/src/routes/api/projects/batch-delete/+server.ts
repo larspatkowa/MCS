@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { deleteProjectById } from '$lib/server/project-delete';
+import { validateIdentifier } from '$lib/server/ingest-validation.js';
 
 export const POST: RequestHandler = async ({ request }) => {
 	let body: unknown;
@@ -14,10 +15,21 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (!Array.isArray(rec.ids) || !rec.ids.every((id): id is string => typeof id === 'string')) {
 		return json({ error: 'ids must be an array of strings' }, { status: 400 });
 	}
+	if (rec.ids.length > 100)
+		return json({ error: 'At most 100 project IDs may be deleted at once' }, { status: 400 });
+	let ids: string[];
+	try {
+		ids = rec.ids.map((id) => validateIdentifier(id, 'project id'));
+	} catch (error) {
+		return json(
+			{ error: error instanceof Error ? error.message : 'Invalid project id' },
+			{ status: 400 }
+		);
+	}
 
 	const deleteFolder = rec.deleteFolder === true;
 
-	const results = rec.ids.map((id) => {
+	const results = ids.map((id) => {
 		const outcome = deleteProjectById(id, deleteFolder);
 		if (outcome.ok) {
 			return { id, ok: true as const };

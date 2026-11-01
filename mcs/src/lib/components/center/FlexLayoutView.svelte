@@ -5,9 +5,6 @@
 	import { isDraggingObject } from '$lib/stores/drag.js';
 	import { sidebarRightVisible } from '$lib/stores/sidebars';
 	import { fetchProjectObject, type ProjectObject } from '$lib/objects/client-cache.js';
-	import { evaluateVisibilityRules, setStreamValue } from '$lib/charts/condition-eval.js';
-	import { subscribeSSE } from '$lib/sse-manager.js';
-	import { isSampleStreamId } from '$lib/charts/sample-streams.js';
 	import LazyView from './LazyView.svelte';
 	import type { FlexLayoutProps, FlexPane } from '$lib/objects/types.js';
 	import { X, ExternalLink, Split, Trash2 } from '@lucide/svelte';
@@ -16,72 +13,6 @@
 	import { page } from '$app/stores';
 
 	let { objectId, props } = $props<{ objectId: string; props: FlexLayoutProps }>();
-
-	// ── Visibility rules evaluation ───────────────────────────────────────────
-	let visibilityMap = $state<Record<string, boolean>>({});
-
-	function evaluateAllVisibility(pane: FlexPane) {
-		const map: Record<string, boolean> = {};
-		function walk(p: FlexPane) {
-			map[p.id] = evaluateVisibilityRules(p.visibilityRules);
-			if (p.type === 'split' && p.children) {
-				walk(p.children[0]);
-				walk(p.children[1]);
-			}
-		}
-		walk(pane);
-		return map;
-	}
-
-	// Re-evaluate visibility every 2 seconds
-	$effect(() => {
-		visibilityMap = evaluateAllVisibility(root);
-		const iv = setInterval(() => {
-			visibilityMap = evaluateAllVisibility(root);
-		}, 2000);
-		return () => clearInterval(iv);
-	});
-
-	function isPaneVisible(paneId: string): boolean {
-		return visibilityMap[paneId] ?? true;
-	}
-
-	// Subscribe to SSE for non-sample visibility rule streams
-	$effect(() => {
-		const proj = $currentProject;
-		if (!proj) return;
-
-		// Collect all unique non-sample stream IDs from visibility rules
-		const streamIds = new Set<string>();
-		function collectStreams(p: FlexPane) {
-			if (p.visibilityRules) {
-				for (const r of p.visibilityRules) {
-					if (!isSampleStreamId(r.streamId)) streamIds.add(r.streamId);
-				}
-			}
-			if (p.type === 'split' && p.children) {
-				collectStreams(p.children[0]);
-				collectStreams(p.children[1]);
-			}
-		}
-		collectStreams(root);
-
-		if (streamIds.size === 0) return;
-
-		// Subscribe to each unique stream
-		const unsubs: (() => void)[] = [];
-		for (const sid of streamIds) {
-			unsubs.push(
-				subscribeSSE(proj.id, sid, (event) => {
-					if ('values' in event) {
-						const v = Number(event.values.value ?? 0);
-						if (!isNaN(v)) setStreamValue(sid, v);
-					}
-				})
-			);
-		}
-		return () => unsubs.forEach((u) => u());
-	});
 
 	function uid() {
 		return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -301,8 +232,7 @@
 		patchTimer = setTimeout(() => {
 			patchTimer = null;
 			const proj = $currentProject;
-			if (!proj || proj.id === 'gallery') return;
-			if (false) return;
+			if (!proj) return;
 			const sel = get(selectedObject);
 			const body: { props: FlexLayoutProps; expectedUpdatedAt?: string } = { props: { root } };
 			if (sel && sel.id === objectId) {
@@ -450,36 +380,25 @@
 	{#if pane.type === 'split' && pane.children}
 		{@const isH = (pane.direction ?? 'horizontal') === 'horizontal'}
 		{@const r = pane.ratio ?? 0.5}
-		{@const child0Vis = isPaneVisible(pane.children[0].id)}
-		{@const child1Vis = isPaneVisible(pane.children[1].id)}
-		{#if child0Vis && child1Vis}
-			<div class="split-wrap" class:split-h={isH} class:split-v={!isH}>
-				<div class="split-child" style="{isH ? 'width' : 'height'}: {r * 100}%">
-					{@render renderPane(pane.children[0])}
-				</div>
-				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-				<div
-					class="divider"
-					class:divider-h={isH}
-					class:divider-v={!isH}
-					role="separator"
-					aria-label="Resize panel divider"
-					onmousedown={(e) => startResize(e, pane)}
-				>
-					<div class="divider-pill"></div>
-				</div>
-				<div class="split-child split-child-flex">
-					{@render renderPane(pane.children[1])}
-				</div>
+		<div class="split-wrap" class:split-h={isH} class:split-v={!isH}>
+			<div class="split-child" style="{isH ? 'width' : 'height'}: {r * 100}%">
+				{@render renderPane(pane.children[0])}
 			</div>
-		{:else if child0Vis}
-			{@render renderPane(pane.children[0])}
-		{:else if child1Vis}
-			{@render renderPane(pane.children[1])}
-		{:else}
-			<!-- Both children hidden -->
-			<div class="hidden-pane"></div>
-		{/if}
+			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+			<div
+				class="divider"
+				class:divider-h={isH}
+				class:divider-v={!isH}
+				role="separator"
+				aria-label="Resize panel divider"
+				onmousedown={(e) => startResize(e, pane)}
+			>
+				<div class="divider-pill"></div>
+			</div>
+			<div class="split-child split-child-flex">
+				{@render renderPane(pane.children[1])}
+			</div>
+		</div>
 	{:else}
 		<!-- Leaf pane -->
 		{@const obj = pane.objectId ? (objCache[pane.objectId] ?? null) : null}
@@ -670,7 +589,7 @@
 	}
 
 	.divider:hover {
-		background: var(--mcs-accent, #4f9cf9);
+		background: var(--mcs-accent, #1a1a1a);
 	}
 
 	.divider-h {
@@ -738,12 +657,7 @@
 		display: flex;
 		align-items: center;
 		pointer-events: auto;
-		background: linear-gradient(
-			180deg,
-			color-mix(in srgb, var(--mcs-bg) 94%, transparent) 0%,
-			color-mix(in srgb, var(--mcs-bg) 82%, transparent) 70%,
-			color-mix(in srgb, var(--mcs-bg) 20%, transparent) 100%
-		);
+		background: color-mix(in srgb, var(--mcs-bg) 94%, transparent);
 		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--mcs-border) 68%, transparent);
 	}
 	.pane-title-handle {
@@ -870,7 +784,7 @@
 	}
 
 	.drop-zone.dz-active {
-		background: color-mix(in srgb, var(--mcs-accent, #4f9cf9) 18%, transparent);
+		background: color-mix(in srgb, var(--mcs-accent, #1a1a1a) 18%, transparent);
 	}
 
 	.drop-zone.dz-active::after {
@@ -895,27 +809,27 @@
 	}
 
 	.dz-left.dz-active {
-		box-shadow: inset 1px 0 0 color-mix(in srgb, var(--mcs-accent, #4f9cf9) 80%, transparent);
+		box-shadow: inset 1px 0 0 color-mix(in srgb, var(--mcs-accent, #1a1a1a) 80%, transparent);
 	}
 
 	.dz-right.dz-active {
-		box-shadow: inset -1px 0 0 color-mix(in srgb, var(--mcs-accent, #4f9cf9) 80%, transparent);
+		box-shadow: inset -1px 0 0 color-mix(in srgb, var(--mcs-accent, #1a1a1a) 80%, transparent);
 	}
 
 	.dz-top.dz-active {
-		box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mcs-accent, #4f9cf9) 80%, transparent);
+		box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mcs-accent, #1a1a1a) 80%, transparent);
 	}
 
 	.dz-bottom.dz-active {
-		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--mcs-accent, #4f9cf9) 80%, transparent);
+		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--mcs-accent, #1a1a1a) 80%, transparent);
 	}
 
 	.dz-center.dz-active {
-		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mcs-accent, #4f9cf9) 55%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mcs-accent, #1a1a1a) 55%, transparent);
 	}
 
 	.drop-hovering {
-		outline: 1px solid color-mix(in srgb, var(--mcs-accent, #4f9cf9) 50%, transparent);
+		outline: 1px solid color-mix(in srgb, var(--mcs-accent, #1a1a1a) 50%, transparent);
 		outline-offset: -1px;
 	}
 

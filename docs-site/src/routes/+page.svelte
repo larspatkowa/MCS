@@ -4,21 +4,20 @@
 	import Callout from '$lib/components/Callout.svelte';
 	import { docTitle } from '$lib/nav.js';
 
-	const quickStart = `cd mcs
-npm install
+	const quickStart = `git clone https://github.com/larspatkowa/MCS.git
+cd MCS
+npm ci
 npm run dev`;
 
-	const dockerStart = `docker compose -f docker/docker-compose.yml up`;
+	const repositoryChecks = `npm run check
+npm run build`;
 
-	const globalCli = `npm install -g ./mcs
-mcs`;
-
-	const ingestExample = `curl -X POST http://localhost:6000/api/ingest \\
+	const ingestExample = `curl -X POST http://127.0.0.1:8080/api/ingest \\
   -H "Content-Type: application/json" \\
   -d '{
     "projectId": "YOUR_PROJECT_ID",
-    "streamId": "demo:temperature",
-    "values": { "value": 22.5 }
+    "streamId": "sensor:temperature",
+    "values": { "value": 22.5, "sensor": "payload-bay" }
   }'`;
 </script>
 
@@ -27,130 +26,160 @@ mcs`;
 </svelte:head>
 
 <PageHeader
-	title="Getting started"
-	description="MCS is a local-first telemetry workspace. Create a project, connect a data source, and build views from the project tree."
+	title="Get started with MCS"
+	description="Run MCS, explore a working telemetry project, or connect your own source."
 />
 
 <article class="doc-page">
 	<section>
 		<p class="doc-lead">
-			MCS runs as a single app. Projects live on disk. You can send data over HTTP or use built-in
-			simulations and connectors (still implemented as plugins on the server).
+			MCS keeps projects on your machine. Each project holds a tree of views and the timestamped
+			data behind them. Start with the path that fits what you are here to do.
 		</p>
+		<nav class="start-options" aria-label="Common tasks">
+			<a class="start-card" href="#run-mcs">
+				<span class="card-title">Run MCS</span>
+				<span class="card-description">Start the app from the source repository.</span>
+				<span class="card-action">Setup steps <span aria-hidden="true">→</span></span>
+			</a>
+			<a class="start-card" href="/guides/flight-system">
+				<span class="card-title">Explore flight data</span>
+				<span class="card-description">Open a ready-made project with sample telemetry.</span>
+				<span class="card-action">Flight system starter <span aria-hidden="true">→</span></span>
+			</a>
+			<a class="start-card" href="#send-your-own-data">
+				<span class="card-title">Send a sample</span>
+				<span class="card-description">Post one reading to a project over HTTP.</span>
+				<span class="card-action">Ingest example <span aria-hidden="true">→</span></span>
+			</a>
+			<a class="start-card" href="/components/line-plot">
+				<span class="card-title">Build a plot</span>
+				<span class="card-description">Choose stream fields and display them over time.</span>
+				<span class="card-action">Line plot guide <span aria-hidden="true">→</span></span>
+			</a>
+		</nav>
 	</section>
 
-	<section>
-		<h2>Run the app</h2>
-		<CodeBlock lang="bash" title="Local setup" code={quickStart} />
+	<section id="run-mcs">
+		<h2>Run MCS</h2>
 		<p>
-			Open <a href="http://localhost:6000">http://localhost:6000</a>, create a project, and select
-			it. The first screen is the project picker. Use the light/dark toggle in the header to switch
-			theme. The picker also supports multi-select deletion with an explicit disk-delete confirmation
-			step. After a project opens, MCS loads the tree on the left and the active view in the main
-			panel. Use <strong>Ctrl+K</strong> (or <strong>⌘K</strong> on macOS) to open the command palette.
+			Node.js 22 or newer is required. The <code>create-mcs</code> and
+			<code>mcs-platform</code> packages are prepared but not published yet, so use the repository:
 		</p>
-		<Callout type="info" title="Explorer defaults">
-			The Explorer tree starts fully expanded by default. Your expand/collapse state is remembered per project.
+		<CodeBlock lang="bash" title="Run from source" code={quickStart} />
+		<p>
+			Open <code>http://127.0.0.1:8080/projects</code> to create or open a project. MCS stores its
+			manifest and SQLite database in that project folder. Once it opens, select an object in the
+			tree to view it.
+		</p>
+		<Callout type="info" title="Explorer tree">
+			The tree starts fully expanded. MCS remembers your expand and collapse state for each project.
 		</Callout>
-		<Callout type="tip" title="Port 6000 in use?">
-			The dev server defaults to port 6000. If something else is bound there, run
-			<code>PORT=7000 npm run dev</code> (or <code>PORT=7000 mcs</code> after a global install), or pass
-			<code>-- --port 7000</code> to Vite.
-		</Callout>
 	</section>
 
-	<section>
-		<h2>Global CLI</h2>
-		<p>
-			From the repository root (after <code>npm install</code>), install the <code>mcs</code> package globally so the
-			<code>mcs</code> command starts the dev server from any working directory. Projects still use
-			<code>mcs/data/</code> inside this clone.
-		</p>
-		<CodeBlock lang="bash" title="Global install" code={globalCli} />
-	</section>
-
-	<section>
-		<h2>Run with Docker</h2>
-		<CodeBlock lang="bash" title="Docker setup" code={dockerStart} />
-		<p>
-			Open <a href="http://localhost:6000">http://localhost:6000</a>. Projects persist in the repo’s
-			<code>mcs/data/</code> folder (bind-mounted into the container).
-		</p>
-	</section>
-
-	<section>
-		<h2>See live data quickly</h2>
+	<section id="send-your-own-data">
+		<h2>Send a sample</h2>
 		<ol>
-			<li>
-				On a fresh install with no recent projects, MCS creates a <strong>Rocket Mission Demo</strong> project
-				and auto-starts the rocket simulation when you open it.
-			</li>
-			<li>
-				From the project picker, under <strong>Create project</strong>, open <strong>Example projects</strong> and pick
-				<strong>Rocket Mission</strong>, <strong>Agriculture</strong>, or <strong>System Monitor</strong>.
-			</li>
-			<li>
-				With a project open, select the project root in the tree. That screen gives an overview of sources, stream IDs,
-				and the objects scaffolded for the project.
-			</li>
-			<li>
-				For start/stop and auto-start, open <strong>Settings → Data sources</strong> (built-in simulations and
-				external connectors).
-			</li>
-			<li>Open scaffolded folders in the tree to inspect the objects a simulation created.</li>
+			<li>In MCS, open <code>http://127.0.0.1:8080/projects</code> and create a project.</li>
+			<li>Copy the project ID from the address after <code>/project/</code>.</li>
+			<li>Replace <code>YOUR_PROJECT_ID</code> below and run the request.</li>
 		</ol>
-		<Callout type="info" title="Interactive tour">
-			Use <strong>Take a project tour</strong> from the project root screen. Example projects tailor the copy; other
-			projects use the generic tour.
-		</Callout>
+		<CodeBlock lang="bash" title="Send one temperature reading" code={ingestExample} />
 		<p>
-			If you want the full mental model for those walkthroughs, start with
-			<a href="/tutorials/example-projects">Example projects</a>.
+			MCS creates <code>sensor:temperature</code> when the first sample arrives. With no timestamp
+			provided, it uses the server's current time. Add stream units and limits through
+			<a href="/api/streams">Streams and limits</a>.
 		</p>
-		<Callout type="tip" title="Gallery">
-			Use the app’s <code>/gallery</code> route when you want to preview the built-in object types
-			with sample data. The gallery matches the main workspace look (flat panels, no extra showcase
-			chrome around the preview). Click <strong>MCS</strong> in the top bar while inside a project, or
-			<strong>MCS</strong> in the gallery sidebar header, to return to the all-projects screen.
+		<Callout type="tip" title="Already have a data source?">
+			For batches, source clocks, sequence numbers, and quality fields, see the
+			<a href="/api/ingest">ingest API reference</a>.
 		</Callout>
 	</section>
 
 	<section>
-		<h2>Core ideas</h2>
+		<h2>How a project is organized</h2>
 		<table>
 			<thead>
-				<tr><th>Concept</th><th>Meaning</th></tr>
+				<tr><th>Term</th><th>In MCS</th></tr>
 			</thead>
 			<tbody>
-				<tr><td>Project</td><td>A folder that contains <code>project.json</code> and <code>mcs.db</code>.</td></tr>
-				<tr><td>Object</td><td>A tree node such as a folder, layout, plot, map, gauge, or note.</td></tr>
-				<tr><td>Stream</td><td>A named telemetry channel with timestamped JSON samples.</td></tr>
-				<tr><td>Data source</td><td>Built-in simulation, spawned connector, or your own HTTP client posting to ingest.</td></tr>
+				<tr><td>Project</td><td>A folder containing the workspace, <code>project.json</code>, and <code>mcs.db</code>.</td></tr>
+				<tr><td>Object</td><td>A tree item, such as a folder, plot, gauge, table, or note.</td></tr>
+				<tr><td>Stream</td><td>A named channel of timestamped samples, such as temperature readings.</td></tr>
+				<tr><td>Run</td><td>A bounded recording that you can replay against one timeline.</td></tr>
 			</tbody>
 		</table>
+		<p><a href="/concepts">Read the full concepts guide</a> for sources, event time, and project storage.</p>
 	</section>
 
 	<section>
-		<h2>Send your own data</h2>
+		<h2>Record and replay a run</h2>
 		<p>
-			If you already have a project and just need to push samples into it, start with the ingest
-			endpoint. MCS creates the stream the first time data arrives if it does not exist yet.
+			For a test or flight session, start a recording before data arrives. MCS groups those samples
+			into a run that can be replayed and exported later.
 		</p>
-		<CodeBlock lang="bash" title="Ingest request" code={ingestExample} />
-		<p>
-			For stream names, units, min/max ranges, and limit thresholds, use
-			<a href="/api/streams">stream declaration and limits</a> or a built-in simulation.
-		</p>
+		<p><a href="/guides/runs">Follow the run recording guide</a> or browse the <a href="/api/runs">runs API</a>.</p>
 	</section>
 
 	<section>
-		<h2>Next steps</h2>
-		<ul>
-			<li><a href="/tutorials/example-projects">Walk through the built-in example projects</a>.</li>
-			<li><a href="/components">Review the current object types</a> exposed by the Add Object modal.</li>
-			<li><a href="/plugins">Inspect data sources</a> (simulations, connectors, and the plugin API).</li>
-			<li><a href="/tutorials/first-plugin">Write your first plugin</a>.</li>
-			<li><a href="/api/ingest">Use the API directly</a> from hardware, scripts, or another service.</li>
-		</ul>
+		<h2>Working on MCS</h2>
+		<p>From the repository root, these commands check the source and build the application and docs.</p>
+		<CodeBlock lang="bash" title="Check and build" code={repositoryChecks} />
 	</section>
 </article>
+
+<style>
+	.start-options {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.7rem;
+		margin-top: 0.15rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	.start-card {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.35rem;
+		padding: 0.9rem 1rem;
+		border: 1px solid var(--docs-border);
+		border-radius: var(--docs-radius);
+		background: var(--docs-surface-strong);
+		color: var(--docs-text);
+		text-decoration: none;
+	}
+
+	.start-card:hover {
+		border-color: var(--docs-border-strong);
+		background: var(--docs-surface);
+		color: var(--docs-text);
+	}
+
+	.card-title {
+		font-size: 0.98rem;
+		font-weight: 600;
+		line-height: 1.35;
+	}
+
+	.card-description {
+		color: var(--docs-text-muted);
+		font-size: 0.88rem;
+		line-height: 1.5;
+	}
+
+	.card-action {
+		margin-top: 0.2rem;
+		color: var(--docs-text);
+		font-size: 0.82rem;
+		font-weight: 500;
+	}
+
+	@media (max-width: 600px) {
+		.start-options {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

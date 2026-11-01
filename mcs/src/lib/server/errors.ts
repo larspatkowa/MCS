@@ -53,7 +53,8 @@ export function handleApiError(e: unknown, context?: string): ReturnType<typeof 
 		logger.debug(context ?? 'api', e.message, { status: e.status });
 		return json(errorBody(e.message), { status: e.status });
 	}
-	const message = e instanceof Error ? e.message : 'Internal server error';
 	logger.exception(context ?? 'api', 'Unhandled error in API handler', e);
-	return json(errorBody(message), { status: 500 });
+	// Do not expose SQLite errors, filesystem paths, or dependency details to
+	// callers. The full exception is retained in the server log above.
+	return json(errorBody('Internal server error'), { status: 500 });
 }

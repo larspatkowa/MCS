@@ -1,7 +1,22 @@
 {
   "name": "mcs-monorepo",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
-  "workspaces": ["mcs", "docs-site"]
+  "workspaces": [
+    "mcs",
+    "create-mcs",
+    "docs-site"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace mcs-platform",
+    "check": "npm run check --workspace mcs-platform && npm run check --workspace mcs-docs",
+    "lint": "npm run lint --workspace mcs-platform",
+    "test:unit": "npm run test:unit --workspace mcs-platform",
+    "test:e2e": "npm run test:e2e --workspace mcs-platform",
+    "test:package": "node scripts/test-package-flow.mjs",
+    "build": "npm run build --workspace mcs-platform && npm run build --workspace mcs-docs",
+    "verify": "npm run check && npm run lint && npm run test:unit && npm run build",
+    "verify:release": "npm run verify && npm run test:e2e && npm run test:e2e --workspace mcs-docs && npm run test:package"
+  }
 }

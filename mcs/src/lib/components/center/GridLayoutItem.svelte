@@ -20,6 +20,7 @@
 		editing = false,
 		isPlacementSelected = false,
 		isInspected = false,
+		showChrome = true,
 		onMove,
 		onResize,
 		onSelect,
@@ -36,6 +37,7 @@
 		editing?: boolean;
 		isPlacementSelected?: boolean;
 		isInspected?: boolean;
+		showChrome?: boolean;
 		onMove?: (itemId: string, x: number, y: number) => void;
 		onResize?: (itemId: string, x: number, y: number, width: number, height: number) => void;
 		onSelect?: (itemId: string) => void;
@@ -183,7 +185,9 @@
 	<ContextMenu.Trigger
 		class="grid-layout-item {editing ? 'editing' : ''} {isPlacementSelected
 			? ' placement-selected'
-			: ''} {isInspected ? ' inspected' : ''} {editing || isDragging || isResizing ? 'touch-none' : ''}"
+			: ''} {isInspected ? ' inspected' : ''} {editing || isDragging || isResizing
+			? 'touch-none'
+			: ''}"
 		style="left: {item.x * gridSize[0]}px; top: {item.y * gridSize[1]}px; width: {item.width *
 			gridSize[0]}px; height: {item.height * gridSize[1]}px;"
 		onpointerdown={startDrag}
@@ -191,21 +195,21 @@
 		aria-label="Layout item {obj?.name ?? item.id}"
 	>
 		{#if obj}
-			<div class="item-titlebar">
-				<button
-					type="button"
-					class="item-titlebtn"
-					aria-label="Inspect {obj.name}"
-					title="Inspect properties"
-					onclick={(e) => {
-						e.stopPropagation();
-						onSelectObject?.(item.objectId);
-					}}
-				>
-					<span class="item-title">{obj.name}</span>
-				</button>
-			</div>
-			<div class="item-content">
+			{#if showChrome}<div class="item-titlebar">
+					<button
+						type="button"
+						class="item-titlebtn"
+						aria-label="Inspect {obj.name}"
+						title="Inspect properties"
+						onclick={(e) => {
+							e.stopPropagation();
+							onSelectObject?.(item.objectId);
+						}}
+					>
+						<span class="item-title">{obj.name}</span>
+					</button>
+				</div>{/if}
+			<div class="item-content" class:no-chrome={!showChrome}>
 				<LazyView typeId={obj.type} objectId={obj.id} props={obj.props ?? {}} />
 			</div>
 		{:else}
@@ -299,6 +303,9 @@
 		align-items: center;
 		justify-content: center;
 	}
+	.item-content.no-chrome {
+		padding-top: 0;
+	}
 	.item-titlebar {
 		position: absolute;
 		top: 0;
@@ -309,12 +316,7 @@
 		display: flex;
 		align-items: center;
 		padding: 0 0.5rem;
-		background: linear-gradient(
-			180deg,
-			color-mix(in srgb, var(--mcs-bg) 94%, transparent) 0%,
-			color-mix(in srgb, var(--mcs-bg) 82%, transparent) 70%,
-			color-mix(in srgb, var(--mcs-bg) 20%, transparent) 100%
-		);
+		background: color-mix(in srgb, var(--mcs-bg) 94%, transparent);
 		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--mcs-border) 68%, transparent);
 	}
 	.item-titlebtn {

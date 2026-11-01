@@ -48,6 +48,7 @@
 <style>
 	.code-block {
 		border: 1px solid var(--docs-border);
+		border-radius: var(--docs-radius);
 		background: var(--docs-code-bg);
 		margin: 0.35rem 0;
 		font-family: var(--docs-font-mono);
@@ -82,6 +83,7 @@
 		align-items: center;
 		padding: 0.14rem 0.42rem;
 		border: 1px solid var(--docs-border);
+		border-radius: var(--docs-radius);
 		font-size: 0.72rem;
 		color: var(--docs-text-muted);
 		background: color-mix(in srgb, var(--docs-surface-raised) 72%, transparent);
@@ -89,6 +91,7 @@
 
 	.copy-button {
 		border: 1px solid var(--docs-border);
+		border-radius: var(--docs-radius);
 		background: transparent;
 		color: var(--docs-text-muted);
 		padding: 0.22rem 0.58rem;

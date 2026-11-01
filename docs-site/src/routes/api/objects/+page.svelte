@@ -3,19 +3,19 @@
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import { docTitle } from '$lib/nav.js';
 
-	const createObject = `curl -X POST http://localhost:6000/api/projects/YOUR_PROJECT_ID/objects \\
+	const createObject = `curl -X POST http://127.0.0.1:8080/api/projects/YOUR_PROJECT_ID/objects \\
   -H "Content-Type: application/json" \\
   -d '{
     "type": "line-plot",
     "parentId": "ROOT_OR_FOLDER_ID",
     "name": "Altitude",
     "props": {
-      "dataSources": ["rocket:altitude"],
+      "dataSources": ["sensor:altitude"],
       "seriesNames": ["Altitude"]
     }
   }'`;
 
-	const patchObject = `curl -X PATCH http://localhost:6000/api/projects/YOUR_PROJECT_ID/objects/OBJECT_ID \\
+	const patchObject = `curl -X PATCH http://127.0.0.1:8080/api/projects/YOUR_PROJECT_ID/objects/OBJECT_ID \\
   -H "Content-Type: application/json" \\
   -d '{
     "name": "Altitude (km)",

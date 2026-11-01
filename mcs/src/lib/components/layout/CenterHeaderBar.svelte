@@ -204,7 +204,8 @@
 			};
 			const fullscreenElement =
 				document.fullscreenElement ?? legacyDocument.webkitFullscreenElement ?? null;
-			browserFullscreenActive = target != null ? fullscreenElement === target : fullscreenElement != null;
+			browserFullscreenActive =
+				target != null ? fullscreenElement === target : fullscreenElement != null;
 		};
 
 		syncBrowserFullscreenState();

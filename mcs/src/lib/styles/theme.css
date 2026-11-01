@@ -1,35 +1,14 @@
-/* MCS theme: grayscale only, light/dark. Override these variables for custom themes. */
+/* MCS theme: grayscale chrome, light/dark. Color is reserved for meaning:
+ * status (nominal, caution, critical) and telemetry series. Override these
+ * variables for custom themes. */
 
-/* Google Sans (from /fonts) */
+/* Instrument Sans is bundled so MCS does not depend on a remote font. */
 @font-face {
-	font-family: 'Google Sans';
-	src: url('/fonts/Google_Sans/GoogleSans-Regular.ttf') format('truetype');
-	font-weight: 400;
+	font-family: 'Instrument Sans';
+	src: url('/fonts/Instrument_Sans/InstrumentSans-Variable.woff2') format('woff2');
+	font-weight: 400 800;
 	font-style: normal;
-}
-@font-face {
-	font-family: 'Google Sans';
-	src: url('/fonts/Google_Sans/GoogleSans-Medium.ttf') format('truetype');
-	font-weight: 500;
-	font-style: normal;
-}
-@font-face {
-	font-family: 'Google Sans';
-	src: url('/fonts/Google_Sans/GoogleSans-SemiBold.ttf') format('truetype');
-	font-weight: 600;
-	font-style: normal;
-}
-@font-face {
-	font-family: 'Google Sans';
-	src: url('/fonts/Google_Sans/GoogleSans-Bold.ttf') format('truetype');
-	font-weight: 700;
-	font-style: normal;
-}
-@font-face {
-	font-family: 'Google Sans Code';
-	src: url('/fonts/Google_Sans_Code/GoogleSansCode-Regular.ttf') format('truetype');
-	font-weight: 400;
-	font-style: normal;
+	font-display: swap;
 }
 
 /* Fallback so --mcs-bg is always defined (e.g. before theme class applied) */
@@ -40,8 +19,23 @@
 	--mcs-header-action-inset: 0.75rem;
 	--mcs-header-toggle-size: 32px;
 	--mcs-touch-target-min: 44px;
-	--mcs-font-sans: 'Google Sans', system-ui, sans-serif;
-	--mcs-font-mono: 'Google Sans Code', ui-monospace, monospace;
+	--mcs-font-sans: 'Instrument Sans', system-ui, sans-serif;
+	--mcs-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	--mcs-space-1: 0.25rem;
+	--mcs-space-2: 0.5rem;
+	--mcs-space-3: 0.75rem;
+	--mcs-space-4: 1rem;
+	--mcs-space-5: 1.5rem;
+	--mcs-control-height-sm: 1.75rem;
+	--mcs-control-height-md: 2.25rem;
+	--mcs-control-height-lg: 2.75rem;
+	--mcs-focus-ring: 0 0 0 2px var(--mcs-bg), 0 0 0 4px var(--mcs-accent);
+	--mcs-motion-fast: 100ms ease;
+	--mcs-motion-standard: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	--mcs-z-modal: 2000;
+	--mcs-success: #1e7a3c;
+	--mcs-warning: #9a5b00;
+	--mcs-danger: #c22a1f;
 	--mcs-gauge-needle: #1a1a1a;
 	--mcs-gauge-track-opacity: 0.6;
 	--mcs-gauge-threshold-opacity: 0.5;
@@ -70,6 +64,18 @@ body {
 	--mcs-border: #cccccc;
 	--mcs-accent: #1a1a1a;
 	--mcs-resizer: #999999;
+	--mcs-success: #1e7a3c;
+	--mcs-warning: #9a5b00;
+	--mcs-danger: #c22a1f;
+	/* Series hues avoid red and amber so data never reads as an alarm. */
+	--mcs-series-1: #1f68c9;
+	--mcs-series-2: #0b7f76;
+	--mcs-series-3: #6b4fd1;
+	--mcs-series-4: #b5317f;
+	--mcs-series-5: #4a7d14;
+	--mcs-series-6: #3f5f73;
+	--mcs-series-7: #7a5a2c;
+	--mcs-series-8: #555555;
 	/* shadcn-svelte aliases (used by lib/components/ui only) */
 	--background: var(--mcs-bg);
 	--foreground: var(--mcs-text);
@@ -85,7 +91,7 @@ body {
 	--muted-foreground: var(--mcs-text-muted);
 	--accent: var(--mcs-surface-alt);
 	--accent-foreground: var(--mcs-text);
-	--destructive: #b91c1c;
+	--destructive: var(--mcs-danger);
 	--destructive-foreground: #ffffff;
 	--border: var(--mcs-border);
 	--input: var(--mcs-border);
@@ -105,6 +111,17 @@ body {
 	--mcs-border: #404040;
 	--mcs-accent: #ffffff;
 	--mcs-resizer: #666666;
+	--mcs-success: #5ccf80;
+	--mcs-warning: #f2b84b;
+	--mcs-danger: #ff6b5e;
+	--mcs-series-1: #64aaff;
+	--mcs-series-2: #4fd1c1;
+	--mcs-series-3: #ad9bff;
+	--mcs-series-4: #f08ccf;
+	--mcs-series-5: #a3d672;
+	--mcs-series-6: #9dbad0;
+	--mcs-series-7: #d9b98c;
+	--mcs-series-8: #d0d0d0;
 	/* shadcn-svelte aliases (used by lib/components/ui only) */
 	--background: var(--mcs-bg);
 	--foreground: var(--mcs-text);
@@ -120,7 +137,7 @@ body {
 	--muted-foreground: var(--mcs-text-muted);
 	--accent: var(--mcs-surface-alt);
 	--accent-foreground: var(--mcs-text);
-	--destructive: #dc2626;
+	--destructive: var(--mcs-danger);
 	--destructive-foreground: #ffffff;
 	--border: var(--mcs-border);
 	--input: var(--mcs-border);

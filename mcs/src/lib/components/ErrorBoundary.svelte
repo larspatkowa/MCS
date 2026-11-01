@@ -68,7 +68,7 @@
 		max-width: 300px;
 	}
 	.mcs-error-icon {
-		color: var(--mcs-alarm, #ef4444);
+		color: var(--mcs-danger, #222222);
 		margin-bottom: 0.25rem;
 	}
 	h3 {

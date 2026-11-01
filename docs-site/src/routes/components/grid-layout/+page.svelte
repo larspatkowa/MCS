@@ -22,7 +22,7 @@
       },
       {
         "id": "cell-2",
-        "objectId": "object:gps-map",
+        "objectId": "object:table",
         "x": 30,
         "y": 0,
         "width": 30,
@@ -76,4 +76,3 @@
 		<CodeBlock lang="json" title="Object JSON (grid layout)" code={example} />
 	</section>
 </article>
-

@@ -1,5 +1,4 @@
 import type { MCSObject, ObjectTreeNode } from './types.js';
-import { getGalleryObject } from '$lib/gallery/resolver.js';
 
 export type ProjectObject = MCSObject & { parentId?: string };
 
@@ -45,11 +44,6 @@ export async function fetchProjectObject(
 	objectId: string,
 	options: { force?: boolean } = {}
 ): Promise<ProjectObject | null> {
-	if (projectId === 'gallery') {
-		const obj = getGalleryObject(objectId);
-		return Promise.resolve(obj ? { ...obj, parentId: undefined } : null);
-	}
-
 	const key = cacheKey(projectId, objectId);
 	if (!options.force) {
 		const cached = objectCache.get(key);

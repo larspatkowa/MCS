@@ -2,10 +2,12 @@
 	let {
 		checked = false,
 		label = '',
+		disabled = false,
 		onChange
 	}: {
 		checked?: boolean;
 		label?: string;
+		disabled?: boolean;
 		onChange?: (v: boolean) => void;
 	} = $props();
 </script>
@@ -15,6 +17,7 @@
 		type="checkbox"
 		class="prop-checkbox-input"
 		{checked}
+		{disabled}
 		onchange={(e) => onChange?.((e.target as HTMLInputElement).checked)}
 	/>
 	{#if label}
@@ -38,5 +41,9 @@
 	}
 	.prop-checkbox-label {
 		flex: 1;
+	}
+	.prop-checkbox:has(input:disabled) {
+		cursor: default;
+		opacity: 0.7;
 	}
 </style>

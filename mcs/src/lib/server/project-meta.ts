@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path';
 export interface ProjectMeta {
 	/** Independent of SemVer; increments when on-disk project layout/meaning changes. */
 	projectFormatVersion: number;
+	/** SQLite schema migration level, independent of the project format. */
+	databaseSchemaVersion: number;
 	/** MCS version that last migrated/wrote project state. */
 	lastMigratedByMcsVersion: string;
 	lastMigratedAt: string;

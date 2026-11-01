@@ -1,17 +1,28 @@
 <script lang="ts">
 	import type { GaugeProps } from '$lib/objects/types.js';
-	import { getSampleStreamValue, isSampleStreamId } from '$lib/charts/sample-streams.js';
 	import { subscribeSSE } from '$lib/sse-manager.js';
 	import { currentProject } from '$lib/stores/project.js';
+	import { timeConductorState } from '$lib/stores/timeline.js';
+	import { replayClock } from '$lib/stores/replay-session.js';
+	import { replayRunId, replaySamplesForStream } from '$lib/stores/run.js';
 	import { formatValue, arcPath, niceTicks } from '$lib/charts/chart-utils.js';
+	import { fetchStreamSamples } from '$lib/charts/useStreamData.js';
 	import { getGaugeDialLayout } from './gauge-layout.js';
 	import ErrorBoundary from '../ErrorBoundary.svelte';
 
 	let { objectId, props } = $props<{ objectId: string; props: GaugeProps }>();
 
-	let value = $state(0);
+	let value = $state<number | null>(null);
 	let displayValue = $state(0); // animated value for smooth rendering
 	let _displayRaw = 0; // non-reactive snapshot for animation start
+	let hasDisplayedValue = false;
+	let displaySourceKey = '';
+	let liveStatus = $state<'loading' | 'live' | 'stale' | 'empty' | 'error'>('loading');
+	let lastLiveReceiveAt = 0;
+	let historySamples = $state<{ timestamp: number; value: number }[]>([]);
+	let latestEventId = 0;
+	let latestLiveEventTime = Number.NEGATIVE_INFINITY;
+	let activeLiveSourceKey = '';
 	let containerEl = $state<HTMLDivElement | null>(null);
 	let w = $state(300);
 	let h = $state(200);
@@ -25,6 +36,12 @@
 	const label = $derived(props.label ?? '');
 	const showLabel = $derived(props.showLabel === true && label.length > 0);
 	const dataSource = $derived(props.dataSource ?? '');
+	const pollInterval = $derived(
+		Math.max(100, Math.min(60_000, Number(props.pollInterval) || 1000))
+	);
+	const timeMode = $derived($timeConductorState.mode);
+	const fixedStart = $derived($timeConductorState.fixedStart);
+	const fixedEnd = $derived($timeConductorState.fixedEnd);
 	const thresholdMin = $derived(props.thresholdMin);
 	const thresholdMax = $derived(props.thresholdMax);
 	const warningMin = $derived(props.warningMin);
@@ -47,18 +64,19 @@
 		return Math.max(1, Math.min(3, Math.ceil(-Math.log10(abs + 1e-12))));
 	});
 
-	// Colors with defaults
-	const arcColor = $derived(props.arcColor ?? props.normalColor ?? '#4f9cf9');
-	const needleColor = $derived(props.needleColor ?? 'var(--mcs-gauge-needle, #e2e8f0)');
-	const thresholdColor = $derived(props.thresholdColor ?? '#f97316');
+	// Theme tokens keep the numeric reading legible in both light and dark modes.
+	// Explicit per-object colors remain respected.
+	const arcColor = $derived(props.arcColor ?? props.normalColor ?? 'var(--mcs-text)');
+	const needleColor = $derived(props.needleColor ?? 'var(--mcs-gauge-needle, #e5e5e5)');
+	const thresholdColor = $derived(props.thresholdColor ?? 'var(--mcs-warning)');
 	const trackColor = $derived(props.trackColor ?? 'var(--mcs-surface-alt)');
 	const trackOpacity = $derived(props.trackOpacity ?? 0.3);
 	const thresholdOpacity = $derived(props.thresholdOpacity ?? 0.4);
 
-	// Configurable state colors — fall back to arcColor / amber / red
+	// Configurable state colors — fall back to neutral tones.
 	const colorNormal = $derived(props.normalColor ?? arcColor);
-	const colorWarning = $derived(props.warningColor ?? '#f59e0b');
-	const colorAlarm = $derived(props.alarmColor ?? '#ef4444');
+	const colorWarning = $derived(props.warningColor ?? 'var(--mcs-warning)');
+	const colorAlarm = $derived(props.alarmColor ?? 'var(--mcs-danger)');
 
 	function isUsableNumber(input: unknown): input is number {
 		return (
@@ -68,9 +86,24 @@
 		);
 	}
 
-	const POLL_INTERVAL = 1500;
 	$effect(() => {
-		const target = value; // reactive dependency
+		const sourceKey = `${$currentProject?.id ?? ''}\u0000${dataSource}`;
+		if (sourceKey !== displaySourceKey) {
+			displaySourceKey = sourceKey;
+			hasDisplayedValue = false;
+		}
+		const target = value;
+		if (target === null) return;
+		const targetValue = target;
+		// A newly opened gauge starts at its first actual reading. Smooth motion is
+		// reserved for changes after a real value has been rendered.
+		if (!hasDisplayedValue) {
+			_displayRaw = target;
+			displayValue = target;
+			hasDisplayedValue = true;
+			return;
+		}
+		if (targetValue === _displayRaw) return;
 		const startVal = _displayRaw; // snapshot without tracking
 		const range = Math.abs((props.max ?? 100) - (props.min ?? 0)) || 1;
 		const DURATION = Math.max(150, Math.min(400, range)); // scale to ~300 ms
@@ -79,7 +112,7 @@
 		function step(now: number) {
 			const t = Math.min((now - startTime) / DURATION, 1);
 			const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // cubic ease in-out
-			_displayRaw = startVal + (target - startVal) * eased;
+			_displayRaw = startVal + (targetValue - startVal) * eased;
 			displayValue = _displayRaw;
 			if (t < 1) rafId = requestAnimationFrame(step);
 		}
@@ -87,55 +120,218 @@
 		return () => cancelAnimationFrame(rafId);
 	});
 
-	// Determine if this is a sample stream, a plugin/SSE stream, or nothing
-	const isSample = $derived(isSampleStreamId(dataSource));
-	const isLiveSSE = $derived(!!dataSource && !isSample);
+	const isHistorical = $derived(timeMode === 'fixed' || $replayClock.mode !== 'live');
+	const isRunReplay = $derived(Boolean($replayRunId) && $replayClock.mode !== 'live');
+	const isLiveSSE = $derived(!!dataSource && !isHistorical);
+	const liveStatusLabel = $derived(
+		isHistorical
+			? liveStatus === 'empty'
+				? 'NO DATA IN WINDOW'
+				: liveStatus === 'error'
+					? 'HISTORY REQUEST FAILED'
+					: ''
+			: liveStatus === 'loading'
+				? 'LOADING'
+				: liveStatus === 'stale'
+					? 'STALE'
+					: liveStatus === 'empty'
+						? 'WAITING FOR DATA'
+						: liveStatus === 'error'
+							? 'DATA REQUEST FAILED'
+							: ''
+	);
 
-	function fetchValue() {
-		if (!dataSource || !isSample) return;
-		value = getSampleStreamValue(dataSource);
+	function numericValue(values: Record<string, unknown>): number {
+		if (values.value !== undefined) return Number(values.value);
+		return (
+			Object.values(values)
+				.map(Number)
+				.find((candidate) => Number.isFinite(candidate)) ?? Number.NaN
+		);
 	}
 
-	// Sample stream polling
+	function acceptLiveValue(
+		candidate: number,
+		eventId?: number,
+		receivedAt?: number,
+		eventTime?: number
+	): void {
+		if (!isUsableNumber(candidate)) return;
+		if (eventId !== undefined && eventId < latestEventId) return;
+		if (eventId !== undefined) latestEventId = Math.max(latestEventId, eventId);
+		lastLiveReceiveAt = Math.max(
+			lastLiveReceiveAt,
+			Number.isFinite(receivedAt) ? receivedAt! * 1000 : Date.now()
+		);
+		// Late arrivals still advance the durable cursor and freshness, but they
+		// must not make a live display move backward in event time.
+		if (Number.isFinite(eventTime) && eventTime! < latestLiveEventTime) {
+			liveStatus =
+				Date.now() - lastLiveReceiveAt > Math.max(10_000, pollInterval * 3) ? 'stale' : 'live';
+			return;
+		}
+		if (Number.isFinite(eventTime)) latestLiveEventTime = Math.max(latestLiveEventTime, eventTime!);
+		value = candidate;
+		liveStatus =
+			Date.now() - lastLiveReceiveAt > Math.max(10_000, pollInterval * 3) ? 'stale' : 'live';
+	}
+
+	function readReplayValue(): void {
+		if (!isRunReplay || !dataSource) return;
+		const sample = replaySamplesForStream(dataSource, { to: $replayClock.playhead })?.at(-1);
+		const candidate = sample
+			? typeof sample.value === 'number'
+				? sample.value
+				: Number(sample.value)
+			: Number.NaN;
+		if (isUsableNumber(candidate)) {
+			value = candidate;
+			liveStatus = 'live';
+		} else {
+			value = null;
+			liveStatus = 'empty';
+		}
+	}
+
+	function readHistoryValue(): void {
+		const playhead = $replayClock.mode === 'live' ? fixedEnd : $replayClock.playhead;
+		let low = 0;
+		let high = historySamples.length;
+		while (low < high) {
+			const middle = low + Math.floor((high - low) / 2);
+			if (historySamples[middle].timestamp <= playhead) low = middle + 1;
+			else high = middle;
+		}
+		const sample = historySamples[low - 1];
+		value = sample && isUsableNumber(sample.value) ? sample.value : null;
+		liveStatus = value === null ? 'empty' : 'live';
+	}
+
 	$effect(() => {
-		if (!isSample || !dataSource) return;
-		fetchValue();
-		const id = setInterval(fetchValue, POLL_INTERVAL);
-		return () => clearInterval(id);
+		const historical = isHistorical;
+		const runId = $replayRunId;
+		const project = $currentProject;
+		const source = dataSource;
+		const from = fixedStart;
+		const to = fixedEnd;
+		if (!source) {
+			value = null;
+			liveStatus = 'empty';
+			historySamples = [];
+			return;
+		}
+		if (!historical || runId || !project) return;
+
+		const controller = new AbortController();
+		let active = true;
+		historySamples = [];
+		liveStatus = 'loading';
+		fetchStreamSamples(project.id, source, {
+			from,
+			to,
+			limit: 10_000,
+			includeEventIds: true,
+			signal: controller.signal
+		})
+			.then((samples) => {
+				if (!active) return;
+				historySamples = samples
+					.map((sample) => ({ timestamp: sample.timestamp, value: Number(sample.value) }))
+					.filter((sample) => Number.isFinite(sample.timestamp) && isUsableNumber(sample.value));
+				readHistoryValue();
+			})
+			.catch(() => {
+				if (!active || controller.signal.aborted) return;
+				value = null;
+				liveStatus = 'error';
+			});
+		return () => {
+			active = false;
+			controller.abort();
+		};
 	});
 
-	// SSE subscription for plugin streams
+	$effect(() => {
+		$replayClock.playhead;
+		if (isRunReplay) readReplayValue();
+		else if (isHistorical) readHistoryValue();
+	});
+
+	// Use SSE for low-latency updates and bounded, cursor-based polling as a
+	// fallback. Cursor requests are uncached so configured refresh rates apply.
 	$effect(() => {
 		if (!isLiveSSE) return;
 		const proj = $currentProject;
 		if (!proj) return;
-		// Seed with last persisted value so gauge shows real data immediately
-		const sid = encodeURIComponent(dataSource);
-		fetch(`/api/projects/${proj.id}/streams/${sid}`)
-			.then((r) => (r.ok ? r.json() : null))
-			.then((data: { lastValue?: number } | null) => {
-				if (isUsableNumber(data?.lastValue)) value = data!.lastValue;
-			})
-			.catch(() => {});
+		const source = dataSource;
+		const intervalMs = pollInterval;
+		const controller = new AbortController();
+		const sourceKey = `${proj.id}\u0000${source}`;
+		if (activeLiveSourceKey !== sourceKey) {
+			activeLiveSourceKey = sourceKey;
+			value = null;
+		}
+		latestEventId = 0;
+		latestLiveEventTime = Number.NEGATIVE_INFINITY;
+		lastLiveReceiveAt = 0;
+		liveStatus = 'loading';
+		let refreshing = false;
+		const refresh = async () => {
+			if (refreshing || controller.signal.aborted) return;
+			refreshing = true;
+			try {
+				const samples = await fetchStreamSamples(proj.id, source, {
+					...(latestEventId > 0 ? { afterEventId: latestEventId } : {}),
+					limit: latestEventId > 0 ? 10_000 : 1,
+					includeEventIds: true,
+					includeReceivedAt: true,
+					signal: controller.signal
+				});
+				if (controller.signal.aborted) return;
+				for (const sample of samples) {
+					acceptLiveValue(
+						Number(sample.value),
+						sample.eventId,
+						sample.receivedAt,
+						sample.timestamp
+					);
+				}
+				if (samples.length === 0) {
+					if (value === null) liveStatus = 'empty';
+					else if (Date.now() - lastLiveReceiveAt > Math.max(10_000, intervalMs * 3)) {
+						liveStatus = 'stale';
+					}
+				}
+			} catch {
+				if (!controller.signal.aborted) {
+					liveStatus =
+						lastLiveReceiveAt > 0 &&
+						Date.now() - lastLiveReceiveAt > Math.max(10_000, intervalMs * 3)
+							? 'stale'
+							: value === null
+								? 'error'
+								: liveStatus;
+				}
+			} finally {
+				refreshing = false;
+			}
+		};
+
 		const unsub = subscribeSSE(proj.id, dataSource, (event) => {
 			if ('values' in event) {
-				const v = event.values as Record<string, unknown>;
-				// Accept "value" field, or the first numeric field
-				if (v.value !== undefined) {
-					const numericValue = Number(v.value);
-					if (isUsableNumber(numericValue)) value = numericValue;
-				} else {
-					for (const key of Object.keys(v)) {
-						const n = Number(v[key]);
-						if (isUsableNumber(n)) {
-							value = n;
-							break;
-						}
-					}
+				const samples = event.samples ?? [event];
+				for (const sample of samples) {
+					acceptLiveValue(numericValue(sample.values), sample.eventId, undefined, sample.timestamp);
 				}
 			}
 		});
-		return unsub;
+		void refresh();
+		const timer = setInterval(() => void refresh(), intervalMs);
+		return () => {
+			controller.abort();
+			clearInterval(timer);
+			unsub();
+		};
 	});
 
 	$effect(() => {
@@ -157,6 +353,7 @@
 
 	// Threshold state determination
 	const gaugeState = $derived.by((): 'normal' | 'warning' | 'alarm' => {
+		if (value == null) return 'normal';
 		if (thresholdMax !== undefined && value >= thresholdMax) return 'alarm';
 		if (thresholdMin !== undefined && value <= thresholdMin) return 'alarm';
 		if (warningMax !== undefined && value >= warningMax) return 'warning';
@@ -292,6 +489,9 @@
 </script>
 
 <div class="gauge-root" bind:this={containerEl}>
+	{#if liveStatusLabel}
+		<span class="telemetry-state" role="status" aria-live="polite">{liveStatusLabel}</span>
+	{/if}
 	<ErrorBoundary>
 		{#if w > 0 && h > 0}
 			{#if displayType === 'dial'}
@@ -415,7 +615,9 @@
 						style:transition="fill 0.4s"
 						style:font-size={`${dialLayout.valueFontSize}px`}
 					>
-						{formatValue(displayValue, precision)}{unit ? ' ' + unit : ''}
+						{value == null ? '—' : formatValue(displayValue, precision)}{value != null && unit
+							? ' ' + unit
+							: ''}
 					</text>
 
 					<!-- Label -->
@@ -578,7 +780,9 @@
 						style:fill={currentColor}
 						style="transition: fill 0.4s"
 					>
-						{formatValue(displayValue, precision)}{unit ? ' ' + unit : ''}
+						{value == null ? '—' : formatValue(displayValue, precision)}{value != null && unit
+							? ' ' + unit
+							: ''}
 					</text>
 					{#if showLinearLabel}
 						<text x={LML} y={labelBelowY} class="linear-label" text-anchor="start">
@@ -594,7 +798,7 @@
 							y1={trackY - 4}
 							x2={tx}
 							y2={trackY + trackH + 4}
-							stroke="#ef4444"
+							stroke="var(--mcs-danger, #222222)"
 							stroke-width="1.6"
 							stroke-dasharray="3 2"
 							opacity="0.8"
@@ -607,7 +811,7 @@
 							y1={trackY - 4}
 							x2={tx}
 							y2={trackY + trackH + 4}
-							stroke="#ef4444"
+							stroke="var(--mcs-danger, #222222)"
 							stroke-width="1.6"
 							stroke-dasharray="3 2"
 							opacity="0.8"
@@ -624,7 +828,22 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
+		position: relative;
 		container-type: size;
+	}
+
+	.telemetry-state {
+		position: absolute;
+		z-index: 1;
+		top: 4px;
+		right: 6px;
+		padding: 2px 5px;
+		border: 1px solid var(--mcs-border);
+		background: var(--mcs-surface);
+		color: var(--mcs-text);
+		font: 600 9px/1.2 var(--mcs-font-mono);
+		letter-spacing: 0.025em;
+		pointer-events: none;
 	}
 
 	/* Dial */

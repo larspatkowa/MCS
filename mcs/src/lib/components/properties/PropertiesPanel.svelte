@@ -10,10 +10,11 @@
 	} from '$lib/stores/project';
 	import { fetchProjectObject, type ProjectObject } from '$lib/objects/client-cache.js';
 	import { getPropertyEditor } from '$lib/object-types/property-editors.js';
+	import { getType } from '$lib/object-types/registry.js';
+	import { LayoutDashboard } from '@lucide/svelte';
 	import ProjectProps from './ProjectProps.svelte';
 	import FolderProps from './FolderProps.svelte';
 	import GridLayoutProps from './GridLayoutProps.svelte';
-	import StackProps from './StackProps.svelte';
 	import PlacementSection from './PlacementSection.svelte';
 	import GenericProps from './GenericProps.svelte';
 	import { propertyFilterText, propertyPanelMode } from '$lib/stores/property-panel';
@@ -111,8 +112,20 @@
 	</div>
 {:else}
 	{@const selected = propertiesTarget}
+	{@const typeInfo = getType(selected.type)}
+	{@const TypeIcon = typeInfo?.icon ?? LayoutDashboard}
 	<div class="panel-header">
-		<div class="panel-title">{selected.name}</div>
+		<div class="panel-title-row">
+			<div class="panel-title">{selected.name}</div>
+			<div
+				class="panel-type"
+				aria-label={`Object type: ${typeInfo?.label ?? selected.type}`}
+				title={`Object type: ${typeInfo?.label ?? selected.type}`}
+			>
+				<TypeIcon size={13} />
+				<span>{typeInfo?.label ?? selected.type}</span>
+			</div>
+		</div>
 		<div class="panel-toolbar">
 			<label
 				class="panel-advanced-toggle"
@@ -157,7 +170,6 @@
 					);
 					const proj = $currentProject;
 					if (!proj) return;
-					if (false) return;
 					fetch(`/api/projects/${proj.id}/objects/${selected.id}`, {
 						method: 'PATCH',
 						headers: { 'Content-Type': 'application/json' },
@@ -173,26 +185,10 @@
 		{/if}
 		<GridLayoutProps
 			props={selected.props}
+			objectId={selected.id}
 			onUpdate={(props) => {
 				const proj = $currentProject;
 				if (!proj) return;
-				if (false) return;
-				fetch(`/api/projects/${proj.id}/objects/${selected.id}`, {
-					method: 'PATCH',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ props, expectedUpdatedAt: selected.updatedAt })
-				}).then((r) => {
-					if (r.ok || r.status === 409) invalidateSelectedObject();
-				});
-			}}
-		/>
-	{:else if selected.type === 'stack'}
-		<StackProps
-			props={selected.props}
-			onUpdate={(props) => {
-				const proj = $currentProject;
-				if (!proj) return;
-				if (false) return;
 				fetch(`/api/projects/${proj.id}/objects/${selected.id}`, {
 					method: 'PATCH',
 					headers: { 'Content-Type': 'application/json' },
@@ -230,6 +226,27 @@
 		font-weight: 600;
 		color: var(--mcs-text);
 		line-height: 1.3;
+	}
+	.panel-title-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.6rem;
+	}
+	.panel-type {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		min-width: 0;
+		font-family: var(--mcs-font-mono);
+		font-size: 0.68rem;
+		font-weight: 500;
+		color: var(--mcs-text-muted);
+		white-space: nowrap;
+	}
+	.panel-type :global(svg) {
+		flex: 0 0 auto;
+		color: var(--mcs-accent);
 	}
 	.panel-toolbar {
 		display: grid;

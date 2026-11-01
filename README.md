@@ -1,64 +1,83 @@
-# Mission Control System (MCS)
+# Mission Control System
 
-Browser-based telemetry and mission control with Svelte and SQLite.
+MCS is a local telemetry workspace built with SvelteKit and SQLite. It accepts normalized timestamped samples, stores them in portable project folders, and displays them with plots, gauges, tables, notes, video, and reusable layouts.
 
-## Get started
+![MCS in dark mode](screenshots/home-dark.jpg)
 
-Pick one.
+## Create a project
 
-### Run from source
+The public package flow is designed to work like a Svelte project:
+
+```bash
+npm create mcs@latest my-project
+cd my-project
+npm run dev -- --open
+```
+
+The `create-mcs` and `mcs-platform` packages are prepared in this repository but are not published yet. Until the first release is published, use the source workflow below.
+
+Each generated project is a normal directory with its own package lock, `project.json`, `mcs.db`, and `.mcs/meta.json`. Run `mcs open` through the generated scripts to enter that project directly. Use `npm run doctor` to validate it. Runtime updates and project-data migrations are separate: `npm update mcs-platform` changes the installed package, then `mcs upgrade .` applies explicit, backed-up project migrations. `npm run update` is the compatible wrapper for both steps.
+
+## Develop the repository
+
+Node.js 22 or newer is required.
 
 ```bash
 git clone https://github.com/larspatkowa/MCS.git
 cd MCS
-npm install
-npm --prefix mcs run dev
+npm ci
+npm run dev
 ```
 
-Open `http://localhost:6000`. On first launch MCS auto-creates a Rocket Mission Demo project so there is live data immediately.
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080). Use [the project manager](http://127.0.0.1:8080/projects) to create or open a project.
 
-### Run globally (CLI)
-
-After installing dependencies once at the repo root (`npm install`), link or install the `mcs` package so the `mcs` command is on your `PATH`:
+## Test the packaged flow locally
 
 ```bash
-npm install -g ./mcs
-mcs
+npm run test:package
 ```
 
-This starts the dev server at `http://localhost:6000` (override with `PORT=7000 mcs` or `mcs -- --port 7000`). Data still lives under `mcs/data/` in your clone.
+This packs both release artifacts into a temporary directory, installs them as a user would, creates a blank project, starts the packaged production server, writes and reads a telemetry sample, stops cleanly, and verifies SQLite integrity. The temporary directory is removed afterward.
 
-### Run with Docker
+## Send telemetry
+
+Copy the project ID from the project screen and post a reading:
 
 ```bash
-docker compose -f docker/docker-compose.yml up
+curl -X POST http://127.0.0.1:8080/api/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectId": "YOUR_PROJECT_ID",
+    "streamId": "my-sensor:temperature",
+    "values": { "value": 22.5 }
+  }'
 ```
 
-Open `http://localhost:6000`. Projects persist in `mcs/data/`.
+Hardware suppliers own capture and calibration. MCS accepts their normalized samples or an imported run package through the narrow adapter boundary.
 
-## Projects
+For versioned, time-aware ingestion, use `/api/ingest/v2`. Source timestamps,
+clock quality, sequence numbers, and idempotency keys are retained with
+normalized event time. MCS provides continuous SQLite history with configurable
+retention alongside saved runs. See [`mcs/README.md`](mcs/README.md) for the
+provider query API, clock conventions, bridge tokens, and backup/restore.
 
-A project is a folder with `project.json`, `mcs.db`, and `.mcs/meta.json`. Projects are created and opened from the project picker in the running app, or via `POST /api/projects`. There is no external scaffolding step.
+## Logs and replay
 
-## What you can do
+The project screen can export and import versioned run packages. Packages include stream definitions, raw timestamped samples, capture metadata, optional media tracks, and integrity information. Replay and export use one canonical clock.
 
-- **Ingest telemetry**: POST JSON to `/api/ingest` and visualize streams (plots, gauges, tables, maps)
-- **Projects are folders**: each project is portable, no external database required
-- **Extend with plugins**: add in-process or out-of-process data sources
+## Verification
 
-## Customize
+```bash
+npm run verify:release
+```
 
-- **Plugin SDK**: see [`mcs/src/lib/server/plugin-sdk/`](mcs/src/lib/server/plugin-sdk/)
-- **Project format**:
-  - `project.json`: project manifest
-  - `mcs.db`: SQLite database (objects, streams, samples, limits)
-  - `.mcs/meta.json`: project format and the last migrated tool version
-- **Theming**: CSS variables in `mcs/src/lib/styles/theme.css` (see `.cursor/rules/theme-and-tailwind.mdc` for constraints)
+This runs static checks, formatting and lint checks, unit tests, production builds, application browser tests, documentation browser tests, and the installed package flow. See the [release checklist](docs/release-checklist.md) for the evidence required before publishing.
 
-## Develop
+MCS binds to loopback by default. A non-loopback bind requires
+`--allow-remote`, `MCS_AUTH_REQUIRED=1`, and a bootstrap secret, and the service
+must sit behind HTTPS. Use `/api/health/ready` for database, source-freshness,
+and authentication readiness. See [Security](SECURITY.md) before deployment.
 
-- App docs: [`mcs/README.md`](mcs/README.md)
+## Fonts and license
 
-## License
-
-MIT. See [`LICENSE`](LICENSE).
+MCS is MIT licensed. Instrument Sans is bundled under the SIL Open Font License; its license is stored beside the font files in both applications. Earlier Google Fonts files were also distributed under the SIL Open Font License, so the original Git commit does not need to be erased. A normal commit that removes those files and keeps the required font licenses is sufficient.

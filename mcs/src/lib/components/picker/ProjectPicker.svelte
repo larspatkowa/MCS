@@ -18,9 +18,6 @@
 		X,
 		ListMinus,
 		Copy,
-		Leaf,
-		Cpu,
-		ChevronDown,
 		Sun,
 		Moon
 	} from '@lucide/svelte';
@@ -58,18 +55,9 @@
 	let copyToast = $state<string | null>(null);
 	let copyToastTimer: ReturnType<typeof setTimeout> | null = null;
 
-	let templateCreating = $state(false);
-	let templateError = $state<string | null>(null);
-	let examplesOpen = $state(false);
-
 	$effect(() => {
 		refreshTrigger;
 		loading = true;
-		if (false) {
-			projects = [];
-			loading = false;
-			return;
-		}
 		fetch('/api/projects')
 			.then((r) => (r.ok ? r.json() : []))
 			.then((list) => (projects = list))
@@ -201,7 +189,6 @@
 	}
 
 	function createProject() {
-		if (false) return;
 		const projectName = createName.trim() || getDefaultProjectName();
 		nameInvalid = false;
 		creating = true;
@@ -224,51 +211,6 @@
 			.then((proj) => goto(`/project/${proj.id}`))
 			.catch((e) => (createError = e.message ?? 'Failed to create project'))
 			.finally(() => (creating = false));
-	}
-
-	type TemplateKind = 'ndvi' | 'system';
-
-	async function createFromTemplate(kind: TemplateKind) {
-		if (false) return;
-		templateCreating = true;
-		templateError = null;
-		const ts = Date.now();
-		const configs: Record<TemplateKind, { name: string; auto: string[]; slug: string }> = {
-			ndvi: { name: 'Agriculture', auto: ['agri-ndvi-mission'], slug: 'ndvi' },
-			system: { name: 'System Monitor', auto: ['system-sensor'], slug: 'system' }
-		};
-		const c = configs[kind];
-		const path = `./data/projects/template-${c.slug}-${ts}`;
-		try {
-			const res = await fetch('/api/projects', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: c.name, path })
-			});
-			const data = await res.json();
-			if (!res.ok)
-				throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to create project');
-			const settings: { tutorialExampleKind: TemplateKind; autoStartPlugins?: string[] } = {
-				tutorialExampleKind: kind
-			};
-			if (c.auto.length > 0) settings.autoStartPlugins = c.auto;
-			const patchRes = await fetch(`/api/projects/${data.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ settings })
-			});
-			const patchData = await patchRes.json().catch(() => ({}));
-			if (!patchRes.ok) {
-				throw new Error(
-					typeof patchData?.error === 'string' ? patchData.error : 'Failed to save example settings'
-				);
-			}
-			await goto(`/project/${data.id}?startTour=1`);
-		} catch (e) {
-			templateError = e instanceof Error ? e.message : 'Failed to create from template';
-		} finally {
-			templateCreating = false;
-		}
 	}
 
 	function showCopyToast(message: string) {
@@ -396,8 +338,6 @@
 						<Moon size={18} />
 					{/if}
 				</button>
-				<a href="/gallery" class="gallery-link" title="Component showcase for developers">Gallery</a
-				>
 			</div>
 		</header>
 
@@ -503,109 +443,43 @@
 				</div>
 			</section>
 
-			{#if !false}
-				<section class="section section-create">
-					<h2><PlusCircle size={16} /> Create project</h2>
-					<div class="section-body">
-						{#if templateError}<p class="error-msg">{templateError}</p>{/if}
-						{#if createError}<p class="error-msg">{createError}</p>{/if}
-						<form
-							novalidate
-							onsubmit={(e) => {
-								e.preventDefault();
-								createProject();
-							}}
-						>
-							<label>
-								Name
-								<input
-									type="text"
-									bind:value={createName}
-									placeholder="My project"
-									class:input-error={nameInvalid}
-									oninput={() => {
-										createError = null;
-										nameInvalid = false;
-									}}
-								/>
-							</label>
-							<label>
-								Path (optional)
-								<input
-									type="text"
-									bind:value={createPath}
-									placeholder="Leave empty for default"
-									oninput={() => (createError = null)}
-								/>
-							</label>
-							<button type="submit" class="btn-primary" disabled={creating || templateCreating}
-								>Create</button
-							>
-						</form>
-						<div class="examples-block">
-							<button
-								type="button"
-								class="examples-toggle"
-								aria-expanded={examplesOpen}
-								aria-controls="example-projects-panel"
-								id="example-projects-toggle"
-								disabled={templateCreating}
-								onclick={() => (examplesOpen = !examplesOpen)}
-							>
-								<span>Example projects</span>
-								<span class="examples-chevron" class:open={examplesOpen} aria-hidden="true"
-									><ChevronDown size={16} /></span
-								>
-							</button>
-							{#if examplesOpen}
-								<div
-									class="examples-panel"
-									id="example-projects-panel"
-									role="region"
-									aria-labelledby="example-projects-toggle"
-								>
-									<ul class="examples-list">
-										<li>
-											<button
-												type="button"
-												class="example-row"
-												disabled={templateCreating}
-												onclick={() => createFromTemplate('ndvi')}
-											>
-												<span class="example-row-icon" aria-hidden="true"
-													><Leaf size={18} /></span
-												>
-												<span class="example-row-text">
-													<span class="example-title">Agriculture</span>
-													<span class="example-desc"
-														>NDVI maps, survey progress, canopy sensing, and field notes.</span
-													>
-												</span>
-											</button>
-										</li>
-										<li>
-											<button
-												type="button"
-												class="example-row"
-												disabled={templateCreating}
-												onclick={() => createFromTemplate('system')}
-											>
-												<span class="example-row-icon" aria-hidden="true"><Cpu size={18} /></span>
-												<span class="example-row-text">
-													<span class="example-title">System Monitor</span>
-													<span class="example-desc"
-														>CPU, memory, disk, and host location with a live workspace.</span
-													>
-												</span>
-											</button>
-										</li>
-									</ul>
-								</div>
-							{/if}
-						</div>
-					</div>
-				</section>
-			{/if}
+			<section class="section section-create">
+				<h2><PlusCircle size={16} /> Create project</h2>
+				<div class="section-body">
+					{#if createError}<p class="error-msg">{createError}</p>{/if}
+					<form
+						novalidate
+						onsubmit={(e) => {
+							e.preventDefault();
+							createProject();
+						}}
+					>
+						<label>
+							Name
+							<input
+								type="text"
+								bind:value={createName}
+								placeholder="My project"
+								class:input-error={nameInvalid}
+								oninput={() => {
+									createError = null;
+									nameInvalid = false;
+								}}
+							/>
+						</label>
+						<label>
+							Path (optional)
+							<input
+								type="text"
+								bind:value={createPath}
+								placeholder="Leave empty for default"
+								oninput={() => (createError = null)}
+							/>
+						</label>
+						<button type="submit" class="btn-primary" disabled={creating}>Create</button>
+					</form>
+				</div>
+			</section>
 		</div>
 
 		{#if editProj}
@@ -817,95 +691,6 @@
 		margin-bottom: 0.75rem;
 		flex-shrink: 0;
 	}
-	.examples-block {
-		margin-top: 0.85rem;
-	}
-	.examples-toggle {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		width: 100%;
-		padding: 0;
-		border: none;
-		background: none;
-		font-family: inherit;
-		font-size: 0.8125rem;
-		color: var(--mcs-text-muted);
-		cursor: pointer;
-		text-align: left;
-	}
-	.examples-toggle:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
-	}
-	.examples-toggle:focus-visible {
-		outline: 2px solid var(--mcs-accent);
-		outline-offset: 2px;
-		border-radius: 0;
-	}
-	.examples-chevron {
-		display: inline-flex;
-		flex-shrink: 0;
-		transition: transform 0.15s ease;
-		color: var(--mcs-text-muted);
-	}
-	.examples-chevron.open {
-		transform: rotate(180deg);
-	}
-	.examples-panel {
-		margin-top: 0.65rem;
-	}
-	.examples-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-	.example-row {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.5rem;
-		width: 100%;
-		padding: 0.5rem 0.55rem;
-		border: 1px solid var(--mcs-border);
-		border-radius: var(--mcs-radius);
-		background: var(--mcs-bg);
-		cursor: pointer;
-		text-align: left;
-		font-family: inherit;
-		color: var(--mcs-text);
-	}
-	.example-row:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
-	}
-	.example-row:focus-visible {
-		outline: 2px solid var(--mcs-accent);
-		outline-offset: 1px;
-	}
-	.example-row-icon {
-		flex-shrink: 0;
-		color: var(--mcs-text-muted);
-		margin-top: 0.1rem;
-	}
-	.example-row-text {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-		min-width: 0;
-	}
-	.example-title {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--mcs-text);
-	}
-	.example-desc {
-		font-size: 0.75rem;
-		line-height: 1.35;
-		color: var(--mcs-text-muted);
-	}
 	.picker-header-row {
 		display: flex;
 		align-items: center;
@@ -952,15 +737,6 @@
 		font-weight: 600;
 		margin: 0;
 		color: var(--mcs-text);
-	}
-	.gallery-link {
-		font-size: 0.875rem;
-		color: var(--mcs-text-muted);
-		text-decoration: none;
-		margin-left: 0;
-	}
-	.gallery-link:hover {
-		color: var(--mcs-accent);
 	}
 	.picker-columns {
 		display: grid;
@@ -1250,10 +1026,10 @@
 		border-color: var(--mcs-accent);
 	}
 	form input.input-error {
-		border-color: #c53030;
+		border-color: var(--mcs-danger);
 	}
 	form input.input-error:focus {
-		border-color: #c53030;
+		border-color: var(--mcs-danger);
 	}
 	form button {
 		margin-top: 0.25rem;
@@ -1351,10 +1127,10 @@
 		border-color: var(--mcs-accent);
 	}
 	.modal-body input.input-error {
-		border-color: #c53030;
+		border-color: var(--mcs-danger);
 	}
 	.modal-body label.label-required:has(input.input-error) {
-		color: #c53030;
+		color: var(--mcs-danger);
 	}
 	.modal-body input.path-readonly {
 		background: var(--mcs-surface-alt);

@@ -1,12 +1,11 @@
 import { writable } from 'svelte/store';
 import type { ProjectDateTimeSettings } from './settings.js';
 import type { MCSObject } from '$lib/objects/types.js';
-import type { TutorialExampleKind } from '$lib/tutorial-kinds.js';
 
 export interface CurrentProjectSettings {
 	dateTime?: ProjectDateTimeSettings;
-	autoStartPlugins?: string[];
-	tutorialExampleKind?: TutorialExampleKind;
+	/** Render the project root as direct actions instead of the onboarding card. */
+	minimalUi?: boolean;
 }
 
 export interface CurrentProject {

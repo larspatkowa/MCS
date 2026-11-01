@@ -2,7 +2,6 @@
 	import { currentProject } from '$lib/stores/project';
 	import { getCreatableTypes } from '$lib/object-types/registry.js';
 	import { X, LayoutDashboard, ChevronRight, ChevronDown } from '@lucide/svelte';
-	import StackProps from '$lib/components/properties/StackProps.svelte';
 	import GridLayoutProps from '$lib/components/properties/GridLayoutProps.svelte';
 	import FolderProps from '$lib/components/properties/FolderProps.svelte';
 
@@ -160,11 +159,6 @@
 
 							{#if selectedType === 'folder'}
 								<FolderProps creationMode={true} />
-							{:else if selectedType === 'stack'}
-								<StackProps
-									props={formProps as import('$lib/objects/types.js').StackProps}
-									onUpdate={(p) => (formProps = { ...p })}
-								/>
 							{:else if selectedType === 'grid-layout'}
 								<GridLayoutProps
 									props={formProps as import('$lib/objects/types.js').GridLayoutProps}
@@ -287,8 +281,6 @@
 		font-weight: 600;
 		font-family: var(--mcs-font-mono);
 		color: var(--mcs-text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
 		flex: 1;
 	}
 	.type-group-count {
@@ -352,7 +344,6 @@
 	.add-modal-fields :global(.chart-props),
 	.add-modal-fields :global(.gauge-props),
 	.add-modal-fields :global(.grid-layout-props),
-	.add-modal-fields :global(.stack-props),
 	.add-modal-fields :global(.layout-props),
 	.add-modal-fields :global(.folder-props) {
 		max-width: none;

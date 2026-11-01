@@ -1,35 +1,30 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 const pages = [
-	{ path: '/', title: 'Getting started | MCS Documentation' },
-	{ path: '/tutorials/example-projects', title: 'Example projects | MCS Documentation' },
-	{ path: '/components', title: 'Components | MCS Documentation' },
-	{ path: '/components/grid-layout', title: 'Grid Layout | MCS Documentation' },
-	{ path: '/components/flex-layout', title: 'Flex Layout | MCS Documentation' },
-	{ path: '/components/gauge', title: 'Gauge | MCS Documentation' },
-	{ path: '/components/map-view', title: 'Map View | MCS Documentation' },
-	{ path: '/configuration', title: 'Configuration | MCS Documentation' },
-	{ path: '/architecture', title: 'Architecture | MCS Documentation' },
-	{ path: '/api/ingest', title: 'Ingest API | MCS Documentation' },
-	{ path: '/api/projects', title: 'Projects API | MCS Documentation' },
-	{ path: '/api/objects', title: 'Objects API | MCS Documentation' },
-	{ path: '/api/streams', title: 'Streams API | MCS Documentation' },
-	{ path: '/api/plugins', title: 'Plugins API | MCS Documentation' },
-	{ path: '/plugins', title: 'Data sources | MCS Documentation' },
-	{ path: '/tutorials/first-plugin', title: 'Write your first plugin | MCS Documentation' },
-	{ path: '/tutorials/plugin-editor', title: 'In-app plugin editor | MCS Documentation' }
+  { path: "/", title: "Getting started | MCS Documentation" },
+  { path: "/components", title: "Components | MCS Documentation" },
+  { path: "/components/grid-layout", title: "Grid Layout | MCS Documentation" },
+  { path: "/components/flex-layout", title: "Flex Layout | MCS Documentation" },
+  { path: "/components/gauge", title: "Gauge | MCS Documentation" },
+  { path: "/configuration", title: "Configuration | MCS Documentation" },
+  { path: "/architecture", title: "Architecture | MCS Documentation" },
+  { path: "/api/ingest", title: "Ingest API | MCS Documentation" },
+  { path: "/api/projects", title: "Projects API | MCS Documentation" },
+  { path: "/api/objects", title: "Objects API | MCS Documentation" },
+  { path: "/api/streams", title: "Streams API | MCS Documentation" },
+  { path: "/api/runs", title: "Runs API | MCS Documentation" },
 ];
 
 for (const { path, title } of pages) {
-	test(`${path} loads with correct title`, async ({ page }) => {
-		const errors: string[] = [];
-		page.on('console', (msg) => {
-			if (msg.type() === 'error') errors.push(msg.text());
-		});
+  test(`${path} loads with correct title`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") errors.push(msg.text());
+    });
 
-		await page.goto(path);
-		await expect(page).toHaveTitle(title);
-		await page.waitForLoadState('networkidle');
-		expect(errors).toHaveLength(0);
-	});
+    await page.goto(path);
+    await expect(page).toHaveTitle(title);
+    await page.waitForLoadState("networkidle");
+    expect(errors).toHaveLength(0);
+  });
 }

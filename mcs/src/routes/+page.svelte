@@ -1,5 +1,12 @@
 <script lang="ts">
-        import ProjectPicker from '$lib/components/picker/ProjectPicker.svelte';
+	import NoProjectScreen from '$lib/components/picker/NoProjectScreen.svelte';
+
+	let { data } = $props<{
+		data: {
+			defaultProjectUnavailable?: boolean;
+			defaultProjectIssue?: string;
+		};
+	}>();
 </script>
 
-<ProjectPicker />
+<NoProjectScreen issue={data.defaultProjectUnavailable ? data.defaultProjectIssue : undefined} />

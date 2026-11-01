@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { randomUUID } from 'crypto';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, rmSync } from 'fs';
 import { join, resolve } from 'path';
 
 export interface MCSConfig {
@@ -17,8 +18,13 @@ export function clearConfigCache(): void {
 	cachedConfigPath = null;
 }
 
-function getConfigDir(): string {
+export function getConfigDir(): string {
 	return process.env.MCS_CONFIG_DIR ?? join(process.cwd(), 'data');
+}
+
+/** Directory for projects created without an explicit path. */
+export function getManagedProjectsDir(): string {
+	return process.env.MCS_PROJECTS_DIR ?? join(process.cwd(), 'data', 'projects');
 }
 
 function ensureConfigDir(configDir: string = getConfigDir()): void {
@@ -86,7 +92,14 @@ export function loadConfig(): MCSConfig {
 export function saveConfig(config: MCSConfig): void {
 	const configPath = getConfigPath();
 	ensureConfigDir();
-	writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+	const temporaryPath = `${configPath}.${randomUUID()}.tmp`;
+	try {
+		writeFileSync(temporaryPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8');
+		renameSync(temporaryPath, configPath);
+	} catch (error) {
+		rmSync(temporaryPath, { force: true });
+		throw error;
+	}
 	cachedConfig = config;
 	cachedConfigPath = configPath;
 }

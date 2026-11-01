@@ -7,11 +7,22 @@
  * down automatically.
  */
 
-
 export interface SSEStreamEvent {
 	streamId: string;
 	timestamp: number;
 	values: Record<string, unknown>;
+	eventId?: number;
+	samples?: {
+		timestamp: number;
+		values: Record<string, unknown>;
+		eventId?: number;
+		sourceId?: string;
+	}[];
+}
+
+export interface SSECheckpointEvent {
+	type: 'checkpoint';
+	eventId: number;
 }
 
 export interface SSELimitEvent {
@@ -26,7 +37,7 @@ export interface SSELimitEvent {
 	};
 }
 
-export type SSEEvent = SSEStreamEvent | SSELimitEvent;
+export type SSEEvent = SSEStreamEvent | SSELimitEvent | SSECheckpointEvent;
 export type SSEHandler = (event: SSEEvent) => void;
 
 interface ProjectConnection {

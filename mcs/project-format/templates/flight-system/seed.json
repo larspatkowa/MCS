@@ -1,0 +1,320 @@
+{
+	"defaultSelection": "flight-overview",
+	"source": {
+		"id": "flight-system-demo",
+		"name": "Flight system demo simulator",
+		"timeSystem": "unix-utc",
+		"timestampUnit": "seconds",
+		"expectedPeriodMs": 1000
+	},
+	"history": {
+		"count": 48,
+		"periodSeconds": 1
+	},
+	"channels": [
+		{
+			"id": "flight.altitude",
+			"name": "Altitude",
+			"metadata": {
+				"field": "value",
+				"units": "m",
+				"description": "Simulated altitude above launch reference",
+				"minimum": 0,
+				"maximum": 260
+			},
+			"center": 180,
+			"amplitude": 22,
+			"periodSeconds": 42,
+			"phase": 0
+		},
+		{
+			"id": "flight.vertical_speed",
+			"name": "Vertical speed",
+			"metadata": {
+				"field": "value",
+				"units": "m/s",
+				"description": "Simulated vertical speed",
+				"minimum": -5,
+				"maximum": 5
+			},
+			"center": 0,
+			"amplitude": 3.2,
+			"periodSeconds": 21,
+			"phase": 0.7
+		},
+		{
+			"id": "propulsion.chamber_pressure",
+			"name": "Chamber pressure",
+			"metadata": {
+				"field": "value",
+				"units": "kPa",
+				"description": "Simulated chamber pressure",
+				"minimum": 0,
+				"maximum": 800
+			},
+			"center": 650,
+			"amplitude": 45,
+			"periodSeconds": 18,
+			"phase": 1.1
+		},
+		{
+			"id": "avionics.battery_voltage",
+			"name": "Battery voltage",
+			"metadata": {
+				"field": "value",
+				"units": "V",
+				"description": "Simulated avionics bus voltage",
+				"minimum": 12,
+				"maximum": 16
+			},
+			"center": 15.2,
+			"amplitude": 0.35,
+			"periodSeconds": 75,
+			"phase": 0.4
+		},
+		{
+			"id": "attitude.roll",
+			"name": "Roll",
+			"metadata": {
+				"field": "value",
+				"units": "deg",
+				"description": "Simulated roll angle",
+				"minimum": -45,
+				"maximum": 45
+			},
+			"center": 0,
+			"amplitude": 22,
+			"periodSeconds": 31,
+			"phase": 1.7
+		},
+		{
+			"id": "attitude.pitch",
+			"name": "Pitch",
+			"metadata": {
+				"field": "value",
+				"units": "deg",
+				"description": "Simulated pitch angle",
+				"minimum": -30,
+				"maximum": 30
+			},
+			"center": 4,
+			"amplitude": 12,
+			"periodSeconds": 53,
+			"phase": 2.2
+		}
+	],
+	"objects": [
+		{
+			"id": "flight-overview",
+			"type": "flex-layout",
+			"name": "Flight overview",
+			"notes": "Operator overview for live telemetry and recent history.",
+			"props": {
+				"root": {
+					"id": "overview-top-bottom",
+					"type": "split",
+					"direction": "vertical",
+					"ratio": 0.58,
+					"children": [
+						{
+							"id": "overview-top",
+							"type": "split",
+							"direction": "horizontal",
+							"ratio": 0.62,
+							"children": [
+								{
+									"id": "overview-altitude-pressure",
+									"type": "leaf",
+									"objectId": "trend-altitude-pressure"
+								},
+								{
+									"id": "overview-attitude",
+									"type": "leaf",
+									"objectId": "trend-attitude"
+								}
+							]
+						},
+						{
+							"id": "overview-bottom-a",
+							"type": "split",
+							"direction": "horizontal",
+							"ratio": 0.25,
+							"children": [
+								{
+									"id": "overview-altitude-gauge",
+									"type": "leaf",
+									"objectId": "gauge-altitude"
+								},
+								{
+									"id": "overview-bottom-b",
+									"type": "split",
+									"direction": "horizontal",
+									"ratio": 0.333,
+									"children": [
+										{
+											"id": "overview-pressure-gauge",
+											"type": "leaf",
+											"objectId": "gauge-pressure"
+										},
+										{
+											"id": "overview-bottom-c",
+											"type": "split",
+											"direction": "horizontal",
+											"ratio": 0.5,
+											"children": [
+												{
+													"id": "overview-voltage-gauge",
+													"type": "leaf",
+													"objectId": "gauge-voltage"
+												},
+												{
+													"id": "overview-telemetry-table",
+													"type": "leaf",
+													"objectId": "telemetry-table"
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			},
+			"children": [
+				{
+					"id": "trend-altitude-pressure",
+					"type": "line-plot",
+					"name": "Altitude and chamber pressure",
+					"props": {
+						"dataSources": ["flight.altitude", "propulsion.chamber_pressure"],
+						"seriesNames": ["Altitude (m)", "Chamber pressure (kPa)"],
+						"windowSec": 60,
+						"pollInterval": 1000,
+						"showGrid": true,
+						"xAxis": {
+							"label": "UTC time"
+						},
+						"yAxis": {
+							"label": "Altitude (m)"
+						},
+						"yAxisRight": {
+							"label": "Chamber pressure (kPa)"
+						}
+					}
+				},
+				{
+					"id": "trend-attitude",
+					"type": "line-plot",
+					"name": "Attitude",
+					"props": {
+						"dataSources": ["attitude.roll", "attitude.pitch"],
+						"seriesNames": ["Roll (deg)", "Pitch (deg)"],
+						"windowSec": 60,
+						"pollInterval": 1000,
+						"showGrid": true,
+						"xAxis": {
+							"label": "UTC time"
+						},
+						"yAxis": {
+							"label": "Angle (deg)"
+						}
+					}
+				},
+				{
+					"id": "gauge-altitude",
+					"type": "gauge",
+					"name": "Altitude",
+					"props": {
+						"dataSource": "flight.altitude",
+						"min": 0,
+						"max": 260,
+						"unit": "m",
+						"label": "Altitude",
+						"showLabel": true,
+						"precision": 1,
+						"pollInterval": 1000
+					}
+				},
+				{
+					"id": "gauge-pressure",
+					"type": "gauge",
+					"name": "Chamber pressure",
+					"props": {
+						"dataSource": "propulsion.chamber_pressure",
+						"min": 0,
+						"max": 800,
+						"unit": "kPa",
+						"label": "Chamber pressure",
+						"showLabel": true,
+						"precision": 0,
+						"pollInterval": 1000
+					}
+				},
+				{
+					"id": "gauge-voltage",
+					"type": "gauge",
+					"name": "Battery voltage",
+					"props": {
+						"dataSource": "avionics.battery_voltage",
+						"min": 12,
+						"max": 16,
+						"unit": "V",
+						"label": "Battery voltage",
+						"showLabel": true,
+						"precision": 2,
+						"pollInterval": 1000
+					}
+				},
+				{
+					"id": "telemetry-table",
+					"type": "telemetry-table",
+					"name": "Latest telemetry",
+					"props": {
+						"rowLimit": 6,
+						"columns": [
+							{
+								"streamId": "flight.altitude",
+								"field": "value",
+								"label": "Altitude (m)"
+							},
+							{
+								"streamId": "flight.vertical_speed",
+								"field": "value",
+								"label": "Vertical speed (m/s)"
+							},
+							{
+								"streamId": "propulsion.chamber_pressure",
+								"field": "value",
+								"label": "Pressure (kPa)"
+							},
+							{
+								"streamId": "avionics.battery_voltage",
+								"field": "value",
+								"label": "Bus (V)"
+							},
+							{
+								"streamId": "attitude.roll",
+								"field": "value",
+								"label": "Roll (deg)"
+							},
+							{
+								"streamId": "attitude.pitch",
+								"field": "value",
+								"label": "Pitch (deg)"
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"id": "operator-notes",
+			"type": "markdown-note",
+			"name": "Operator notes",
+			"props": {
+				"content": "# Operator notes\n\nAll preloaded values in this starter project are simulated. Review source clock, units, expected period, and value limits before connecting hardware.\n\nThe optional demo sender only posts telemetry to the local MCS ingest endpoint. It does not send commands."
+			}
+		}
+	]
+}

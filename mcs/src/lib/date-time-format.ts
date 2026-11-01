@@ -4,6 +4,8 @@ export type TimeFormatId = '24h' | '12h';
 export interface DateTimeFormatOptions {
 	dateFormat: DateFormatId;
 	timeFormat: TimeFormatId;
+	/** Render in UTC instead of the browser's local zone. Telemetry time uses UTC. */
+	utc?: boolean;
 }
 
 const DEFAULT_OPTIONS: DateTimeFormatOptions = {
@@ -13,30 +15,31 @@ const DEFAULT_OPTIONS: DateTimeFormatOptions = {
 
 export const DEFAULT_DATE_TIME_OPTIONS = DEFAULT_OPTIONS;
 
-function formatDatePart(date: Date, format: DateFormatId, locale?: string): string {
+function formatDatePart(date: Date, format: DateFormatId, utc: boolean, locale?: string): string {
 	if (format === 'short') {
-		return new Intl.DateTimeFormat(locale, { dateStyle: 'short' }).format(date);
+		return new Intl.DateTimeFormat(locale, {
+			dateStyle: 'short',
+			timeZone: utc ? 'UTC' : undefined
+		}).format(date);
 	}
+	const y = utc ? date.getUTCFullYear() : date.getFullYear();
+	const m = (utc ? date.getUTCMonth() : date.getMonth()) + 1;
+	const d = utc ? date.getUTCDate() : date.getDate();
 	if (format === 'iso') {
-		const y = date.getFullYear();
-		const m = String(date.getMonth() + 1).padStart(2, '0');
-		const d = String(date.getDate()).padStart(2, '0');
-		return `${y}-${m}-${d}`;
+		return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 	}
 	// yyyy/m/d - no leading zeros on month/day
-	const y = date.getFullYear();
-	const m = date.getMonth() + 1;
-	const d = date.getDate();
 	return `${y}/${m}/${d}`;
 }
 
-function formatTimePart(date: Date, format: TimeFormatId, locale?: string): string {
+function formatTimePart(date: Date, format: TimeFormatId, utc: boolean, locale?: string): string {
 	const hour12 = format === '12h';
 	const formatter = new Intl.DateTimeFormat(locale, {
 		hour: '2-digit',
 		minute: '2-digit',
 		second: '2-digit',
-		hour12
+		hour12,
+		timeZone: utc ? 'UTC' : undefined
 	});
 	return formatter.format(date);
 }
@@ -89,7 +92,8 @@ export function formatDateTime(
 	locale?: string
 ): string {
 	const opts = { ...DEFAULT_OPTIONS, ...options };
-	const dateStr = formatDatePart(date, opts.dateFormat, locale);
-	const timeStr = formatTimePart(date, opts.timeFormat, locale);
-	return `${dateStr} ${timeStr}`;
+	const utc = opts.utc === true;
+	const dateStr = formatDatePart(date, opts.dateFormat, utc, locale);
+	const timeStr = formatTimePart(date, opts.timeFormat, utc, locale);
+	return utc ? `${dateStr} ${timeStr} UTC` : `${dateStr} ${timeStr}`;
 }

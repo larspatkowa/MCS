@@ -13,21 +13,20 @@ describe('containment', () => {
 		const nonContainers: ObjectType[] = [
 			'gauge',
 			'line-plot',
-			'bar-chart',
-			'scatter-plot',
-			'overlay-plot',
-			'stacked-plot'
+			'telemetry-table',
+			'markdown-note',
+			'image',
+			'video-stream'
 		];
 		for (const type of nonContainers) {
 			expect(canContainChildren(type)).toBe(false);
 		}
 	});
 
-	it('includes project, folder, layout, grid-layout, stack', () => {
+	it('includes project, folder, and supported layouts', () => {
 		expect(CONTAINER_OBJECT_TYPES).toContain('project');
 		expect(CONTAINER_OBJECT_TYPES).toContain('folder');
-		expect(CONTAINER_OBJECT_TYPES).toContain('layout');
 		expect(CONTAINER_OBJECT_TYPES).toContain('grid-layout');
-		expect(CONTAINER_OBJECT_TYPES).toContain('stack');
+		expect(CONTAINER_OBJECT_TYPES).toContain('flex-layout');
 	});
 });

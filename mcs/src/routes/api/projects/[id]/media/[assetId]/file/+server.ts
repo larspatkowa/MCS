@@ -1,0 +1,58 @@
+import { createReadStream, statSync } from 'node:fs';
+import { Readable } from 'node:stream';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { getProjectPathById } from '$lib/server/project.js';
+import { apiErrorResponse } from '$lib/server/errors.js';
+import * as mediaDb from '$lib/server/media-db.js';
+
+export const GET: RequestHandler = ({ params, request }) => {
+	const projectPath = getProjectPathById(params.id);
+	if (!projectPath) return apiErrorResponse('Project not found', 404);
+	try {
+		const asset = mediaDb.getMediaAsset(projectPath, params.assetId);
+		if (!asset) return apiErrorResponse('Media asset not found', 404);
+		const path = mediaDb.getMediaAssetPath(projectPath, asset.id);
+		const size = statSync(path).size;
+		const range = request.headers.get('range');
+		const headers = new Headers({
+			'content-type': asset.mimeType,
+			'accept-ranges': 'bytes',
+			'cache-control': 'public, max-age=31536000, immutable'
+		});
+		if (!range) {
+			headers.set('content-length', String(size));
+			return new Response(Readable.toWeb(createReadStream(path)) as ReadableStream, { headers });
+		}
+		const match = range.match(/^bytes=(\d*)-(\d*)$/);
+		if (!match)
+			return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+		const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2] || 0));
+		const end = match[2] ? Number(match[2]) : size - 1;
+		if (
+			!Number.isInteger(start) ||
+			!Number.isInteger(end) ||
+			start < 0 ||
+			end < start ||
+			start >= size
+		)
+			return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+		const boundedEnd = Math.min(end, size - 1);
+		headers.set('content-range', `bytes ${start}-${boundedEnd}/${size}`);
+		headers.set('content-length', String(boundedEnd - start + 1));
+		return new Response(
+			Readable.toWeb(createReadStream(path, { start, end: boundedEnd })) as ReadableStream,
+			{ status: 206, headers }
+		);
+	} catch (error) {
+		return json(
+			{ error: 'Media file is unavailable' },
+			{
+				status:
+					error instanceof Error && error.message === 'Media file is missing from the project'
+						? 404
+						: 400
+			}
+		);
+	}
+};

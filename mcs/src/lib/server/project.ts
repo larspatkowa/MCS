@@ -1,19 +1,19 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
 import { randomUUID } from 'crypto';
-import { getDb } from './db.js';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, renameSync, rmSync } from 'fs';
+import { join, resolve } from 'path';
 import { addRecentProject, loadConfig } from './config.js';
-import { writeProjectMeta } from './project-meta.js';
-import type { TutorialExampleKind } from '$lib/tutorial-kinds.js';
+import { initializeProjectDirectory } from '../../../project-format/project.js';
 
 export interface ProjectManifestSettings {
+	[key: string]: unknown;
 	dateTime?: {
 		dateFormat?: string;
 		timeFormat?: string;
 	};
-	autoStartPlugins?: string[];
-	/** Set for example projects so the in-app tour uses matching copy. */
-	tutorialExampleKind?: TutorialExampleKind;
+	/** Render the project root as direct actions instead of the onboarding card. */
+	minimalUi?: boolean;
+	/** Continuous-history retention window. Saved runs are retained independently. */
+	telemetryRetentionDays?: number;
 }
 
 export interface ProjectManifest {
@@ -34,6 +34,10 @@ function normalizeProjectPath(path: string): string {
 	return resolve(path);
 }
 
+function isSafeProjectId(id: string): boolean {
+	return id.length > 0 && id.length <= 200 && /^[A-Za-z0-9][A-Za-z0-9:_.-]*$/.test(id);
+}
+
 export function getManifestPath(projectPath: string): string {
 	return join(projectPath, MANIFEST_FILENAME);
 }
@@ -44,7 +48,24 @@ export function readManifest(projectPath: string): ProjectManifest | null {
 	if (!existsSync(path)) return null;
 	try {
 		const raw = readFileSync(path, 'utf-8');
-		return JSON.parse(raw) as ProjectManifest;
+		const manifest = JSON.parse(raw) as Partial<ProjectManifest>;
+		if (
+			typeof manifest.id !== 'string' ||
+			!manifest.id ||
+			typeof manifest.name !== 'string' ||
+			!manifest.name.trim() ||
+			typeof manifest.createdAt !== 'string' ||
+			!manifest.createdAt
+		) {
+			return null;
+		}
+		if (
+			manifest.settings !== undefined &&
+			(!manifest.settings || typeof manifest.settings !== 'object')
+		) {
+			return null;
+		}
+		return manifest as ProjectManifest;
 	} catch {
 		return null;
 	}
@@ -56,35 +77,29 @@ export function writeManifest(projectPath: string, manifest: ProjectManifest): v
 		mkdirSync(normalizedPath, { recursive: true });
 	}
 	const path = getManifestPath(normalizedPath);
-	writeFileSync(path, JSON.stringify(manifest, null, 2), 'utf-8');
+	const temporaryPath = `${path}.${randomUUID()}.tmp`;
+	try {
+		writeFileSync(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8');
+		renameSync(temporaryPath, path);
+	} catch (error) {
+		rmSync(temporaryPath, { force: true });
+		throw error;
+	}
 }
 
-export function createProject(projectPath: string, name: string, notes?: string): ProjectManifest {
+export function createProject(
+	projectPath: string,
+	name: string,
+	notes?: string,
+	settings?: ProjectManifestSettings
+): ProjectManifest {
 	const normalizedPath = normalizeProjectPath(projectPath);
-	if (existsSync(normalizedPath)) {
-		const existing = readManifest(normalizedPath);
-		if (existing) throw new Error('Project already exists at this path');
-	}
-	mkdirSync(normalizedPath, { recursive: true });
-	const id = randomUUID();
-	const now = new Date().toISOString();
-	const manifest: ProjectManifest = { id, name, createdAt: now, notes };
-	writeManifest(normalizedPath, manifest);
-
-	// Create root project object in objects table
-	const db = getDb(normalizedPath);
-	const rootId = id; // use same id as project for root object
-	db.prepare(
-		`INSERT INTO objects (id, type, parent_id, sort_order, name, notes, props, created_at, updated_at)
-     VALUES (?, 'project', NULL, 0, ?, ?, '{}', ?, ?)`
-	).run(rootId, name, notes ?? '', now, now);
-
-	// Per-project metadata for migrations/reproducibility. This is separate from the app manifest.
-	writeProjectMeta(normalizedPath, {
-		projectFormatVersion: 1,
-		lastMigratedByMcsVersion: process.env.npm_package_version ?? 'unknown',
-		lastMigratedAt: now
-	});
+	const manifest = initializeProjectDirectory(normalizedPath, {
+		name,
+		notes,
+		settings,
+		mcsVersion: process.env.MCS_VERSION ?? process.env.npm_package_version ?? 'development'
+	}) as ProjectManifest;
 
 	addRecentProject(normalizedPath);
 	return manifest;
@@ -96,6 +111,7 @@ export function isProjectPath(projectPath: string): boolean {
 }
 
 export function getProjectPathById(id: string): string | null {
+	if (typeof id !== 'string' || !isSafeProjectId(id)) return null;
 	// First try cached path, but verify the manifest still matches in case
 	// the project was moved or deleted.
 	const cachedPath = projectIdPathCache.get(id);
@@ -110,7 +126,11 @@ export function getProjectPathById(id: string): string | null {
 	}
 
 	const config = loadConfig();
-	for (const path of config.recentProjectPaths) {
+	const configuredPaths = [
+		...(config.defaultProjectPath ? [config.defaultProjectPath] : []),
+		...config.recentProjectPaths
+	].filter((path, index, paths) => paths.indexOf(path) === index);
+	for (const path of configuredPaths) {
 		const normalizedPath = normalizeProjectPath(path);
 		const manifest = readManifest(normalizedPath);
 		if (manifest?.id === id) {

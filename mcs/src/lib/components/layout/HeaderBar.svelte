@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { currentProject } from '$lib/stores/project';
 	import { theme } from '$lib/stores/theme';
@@ -17,6 +18,23 @@
 
 	let projectSwitcherOpen = $state(false);
 	let projects = $state<{ id: string; name: string; path: string }[]>([]);
+	let signedInName = $state('');
+
+	onMount(() => {
+		fetch('/api/auth/session')
+			.then((response) => (response.ok ? response.json() : null))
+			.then((session) => {
+				if (session?.authenticated && typeof session.user?.displayName === 'string') {
+					signedInName = session.user.displayName;
+				}
+			})
+			.catch(() => {});
+	});
+
+	async function signOut() {
+		await fetch('/api/auth/logout', { method: 'POST' });
+		await goto('/login');
+	}
 
 	$effect(() => {
 		if (!projectSwitcherOpen) return;
@@ -31,17 +49,15 @@
 	}
 
 	function openAllProjects() {
-		goto('/');
+		goto('/projects');
 		projectSwitcherOpen = false;
 	}
 
-	const brandHref = $derived(
-		false ? `/?object=${encodeURIComponent(`demo-layout`)}` : '/'
-	);
+	const brandHref = '/projects';
 </script>
 
 <div class="header-bar">
-	<a href={brandHref} class="brand" aria-label="MCS — all projects" title="All projects">MCS</a>
+	<a href={brandHref} class="brand" aria-label="MCS, all projects" title="All projects">MCS</a>
 	{#if $currentProject}
 		<DropdownMenuRoot bind:open={projectSwitcherOpen}>
 			<DropdownMenuTrigger class="project-switcher-trigger" aria-label="Switch project">
@@ -69,7 +85,7 @@
 					<DropdownMenuGroup>
 						<DropdownMenuItem onSelect={openAllProjects}>
 							<PlusCircle size={14} />
-							Open all projects / Create project
+							Open project manager / Create project
 						</DropdownMenuItem>
 					</DropdownMenuGroup>
 				</DropdownMenuContent>
@@ -91,7 +107,6 @@
 		type="button"
 		aria-label="Settings"
 		title="Settings"
-		data-tutorial="settings-btn"
 		onclick={() => settingsModalOpen.set(true)}
 	>
 		<Settings size={18} />
@@ -109,6 +124,17 @@
 			<Sun size={18} />
 		{/if}
 	</button>
+	{#if signedInName}
+		<button
+			class="sign-out"
+			type="button"
+			onclick={signOut}
+			aria-label="Sign out"
+			title={`Sign out ${signedInName}`}
+		>
+			Sign out
+		</button>
+	{/if}
 </div>
 
 <style>
@@ -196,6 +222,25 @@
 		color: var(--mcs-text);
 	}
 	.icon-btn:focus-visible {
+		outline: 2px solid var(--mcs-accent);
+		outline-offset: 2px;
+	}
+	.sign-out {
+		min-height: 1.75rem;
+		padding: 0 0.5rem;
+		border: 1px solid var(--mcs-border);
+		border-radius: var(--mcs-radius);
+		background: transparent;
+		color: var(--mcs-text-muted);
+		font: inherit;
+		font-size: 0.75rem;
+		cursor: pointer;
+	}
+	.sign-out:hover {
+		background: var(--mcs-surface-alt);
+		color: var(--mcs-text);
+	}
+	.sign-out:focus-visible {
 		outline: 2px solid var(--mcs-accent);
 		outline-offset: 2px;
 	}

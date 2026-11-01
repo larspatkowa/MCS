@@ -19,24 +19,8 @@
 	.callout {
 		padding: 0.95rem 1rem;
 		border: 1px solid var(--docs-border);
-		border-left-width: 2px;
-		background: color-mix(in srgb, var(--docs-surface-strong) 84%, transparent);
-	}
-
-	.callout-tip {
-		border-color: var(--docs-accent);
-	}
-
-	.callout-warning {
-		border-color: var(--docs-warning);
-	}
-
-	.callout-info {
-		border-color: var(--docs-accent);
-	}
-
-	.callout-danger {
-		border-color: var(--docs-danger);
+		border-radius: var(--docs-radius);
+		background: var(--docs-surface-strong);
 	}
 
 	.callout-header {

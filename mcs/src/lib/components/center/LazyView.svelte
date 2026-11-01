@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * Wrapper component that resolves a lazy-loaded view component.
-	 * Used by container views (Grid, Stack, Flex) to render children
+	 * Used by grid and flex containers to render children
 	 * whose view components may not be loaded yet.
 	 */
 	import { getView, resolveView, hasView } from '$lib/object-types/views.js';

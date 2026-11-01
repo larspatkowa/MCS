@@ -5,5 +5,5 @@ export default defineConfig({
 	timeout: 60000,
 	outputDir: 'test-results',
 	globalTeardown: './e2e/global-teardown',
-	use: { baseURL: 'http://localhost:6000' }
+	use: { baseURL: 'http://localhost:8080' }
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { X, Plus } from '@lucide/svelte';
+	import { X } from '@lucide/svelte';
 
 	type Option = { value: string; label: string };
 	let {
@@ -63,7 +63,6 @@
 					<option value={opt.value}>{opt.label}</option>
 				{/each}
 			</select>
-			<Plus size={14} class="stream-add-icon" />
 		</div>
 	{:else if values.length === 0}
 		<p class="stream-empty">No streams available.</p>
@@ -119,7 +118,7 @@
 		border-radius: 2px;
 	}
 	.stream-tag-remove:hover {
-		color: var(--mcs-danger, #ef4444);
+		color: var(--mcs-danger, #222222);
 	}
 
 	.stream-add-row {
@@ -132,7 +131,6 @@
 		width: 100%;
 		box-sizing: border-box;
 		padding: 0.3rem 0.5rem;
-		padding-left: 1.4rem;
 		font-size: 0.8rem;
 		background: var(--mcs-surface);
 		border: 1px dashed var(--mcs-border);
@@ -146,13 +144,6 @@
 		outline: none;
 		border-color: var(--mcs-accent);
 		color: var(--mcs-text);
-	}
-
-	.stream-add-row :global(.stream-add-icon) {
-		position: absolute;
-		left: 0.35rem;
-		pointer-events: none;
-		color: var(--mcs-text-muted);
 	}
 
 	.stream-empty {

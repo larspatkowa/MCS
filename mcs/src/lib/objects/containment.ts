@@ -4,9 +4,8 @@ import type { ObjectType } from './types.js';
 export const CONTAINER_OBJECT_TYPES: readonly ObjectType[] = [
 	'project',
 	'folder',
-	'layout',
 	'grid-layout',
-	'stack'
+	'flex-layout'
 ] as const;
 
 export function canContainChildren(type: ObjectType): boolean {

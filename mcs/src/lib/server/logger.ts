@@ -16,7 +16,7 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export interface LogRecord {
 	ts: string; // ISO-8601
 	level: LogLevel;
-	context: string; // e.g. 'ingest', 'plugin', 'api'
+	context: string; // e.g. 'ingest', 'run', 'api'
 	msg: string;
 	[key: string]: unknown; // arbitrary structured fields
 }

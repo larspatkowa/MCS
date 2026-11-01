@@ -1,4 +1,11 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
+import {
+	configureReplaySession,
+	exitReplaySession,
+	replayClock,
+	setReplayBounds,
+	seekReplay
+} from './replay-session.js';
 
 export type TimelineRangeId = '1h' | '24h';
 
@@ -73,6 +80,29 @@ function defaultState(): TimeConductorState {
 
 export const timeConductorState = writable<TimeConductorState>(defaultState());
 
+if (typeof window !== 'undefined' && get(timeConductorState).mode === 'fixed') {
+	const initial = get(timeConductorState);
+	configureReplaySession({
+		start: initial.fixedStart,
+		end: initial.fixedEnd,
+		playhead: initial.fixedEnd
+	});
+}
+
+// Keep legacy timeline consumers visually synchronized while replay-capable
+// components move to the shared replay clock.
+replayClock.subscribe((clock) => {
+	timeConductorState.update((state) => {
+		if (clock.mode === 'live') return { ...state, mode: 'realtime' };
+		return {
+			...state,
+			mode: 'fixed',
+			fixedStart: clock.start,
+			fixedEnd: clock.end
+		};
+	});
+});
+
 timeConductorState.subscribe((s) => {
 	try {
 		localStorage.setItem(STORAGE_KEY_MODE, s.mode);
@@ -100,6 +130,8 @@ export function getTimeBounds(
 	state: TimeConductorState,
 	nowSec: number = Date.now() / 1000
 ): { start: number; end: number } {
+	const clock = get(replayClock);
+	if (clock.mode !== 'live') return { start: clock.start, end: clock.end };
 	if (state.mode === 'realtime') {
 		return {
 			start: nowSec - state.realtimeWindowSec,
@@ -110,15 +142,20 @@ export function getTimeBounds(
 }
 
 export function setFixedBounds(start: number, end: number): void {
-	timeConductorState.update((s) => ({
-		...s,
-		mode: 'fixed',
-		fixedStart: start,
-		fixedEnd: end
-	}));
+	if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+	const fixedStart = Math.min(start, end);
+	const fixedEnd = Math.max(fixedStart + 0.001, end);
+	timeConductorState.update((s) => ({ ...s, mode: 'fixed', fixedStart, fixedEnd }));
+	const clock = get(replayClock);
+	if (clock.mode === 'live' || clock.runId === null) {
+		configureReplaySession({ start: fixedStart, end: fixedEnd, playhead: fixedEnd });
+	} else {
+		setReplayBounds(fixedStart, fixedEnd);
+	}
 }
 
 export function setRealtimeWithPreset(rangeId: TimelineRangeId): void {
+	exitReplaySession();
 	timelineRange.set(rangeId);
 	timeConductorState.update((s) => ({
 		...s,
@@ -128,10 +165,9 @@ export function setRealtimeWithPreset(rangeId: TimelineRangeId): void {
 }
 
 export function shiftFixedWindow(deltaSec: number): void {
-	timeConductorState.update((s) => ({
-		...s,
-		mode: 'fixed',
-		fixedStart: s.fixedStart + deltaSec,
-		fixedEnd: s.fixedEnd + deltaSec
-	}));
+	if (!Number.isFinite(deltaSec)) return;
+	const current = get(timeConductorState);
+	const clock = get(replayClock);
+	setFixedBounds(current.fixedStart + deltaSec, current.fixedEnd + deltaSec);
+	if (clock.mode !== 'live') seekReplay(clock.playhead + deltaSec);
 }

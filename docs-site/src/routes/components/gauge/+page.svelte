@@ -8,7 +8,7 @@
   "type": "gauge",
   "name": "Tank pressure",
   "props": {
-    "dataSource": "sample:pressure",
+		"dataSource": "sensor:pressure",
     "displayType": "dial",
     "min": 0,
     "max": 3000,
@@ -43,19 +43,15 @@
 
 <PageHeader
 	title="Gauge"
-	badge="Component"
 	description="Single-stream readout as either a linear bar or a dial gauge."
 />
 
 <article class="doc-page">
 	<section>
 		<p class="doc-lead">
-			Gauges visualize one scalar stream. They can poll sample streams (the <code>sample:*</code> ids)
-			or subscribe to live SSE streams from plugins/connectors.
+			Gauges visualize one scalar stream from the current project. When no numeric reading is available,
+			the gauge shows an unavailable value.
 		</p>
-		<Callout type="tip" title="Quick preview">
-			Use <code>/gallery</code> to preview gauges with built-in sample data.
-		</Callout>
 	</section>
 
 	<section>
@@ -80,4 +76,3 @@
 		<CodeBlock lang="json" title="Object JSON (linear)" code={exampleLinear} />
 	</section>
 </article>
-

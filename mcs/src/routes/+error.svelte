@@ -11,7 +11,7 @@
 
 	function handleBackClick(e: MouseEvent) {
 		e.preventDefault();
-		goto('/');
+		goto('/projects');
 	}
 </script>
 
@@ -25,7 +25,7 @@
 				<pre>{errorDetails}</pre>
 			</details>
 		{/if}
-		<a href="/" onclick={handleBackClick} class="link">Back to app</a>
+		<a href="/projects" onclick={handleBackClick} class="link">Back to project manager</a>
 	</div>
 </div>
 

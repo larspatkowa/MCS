@@ -98,11 +98,11 @@
 			},
 			{
 				id: 'project-picker',
-				label: 'Go to project picker',
+				label: 'Go to project manager',
 				keywords: ['project', 'picker', 'create', 'open', 'switch', 'home'],
 				icon: FolderOpen,
 				category: 'command',
-				run: () => goto('/')
+				run: () => goto('/projects')
 			},
 			{
 				id: 'new-object',

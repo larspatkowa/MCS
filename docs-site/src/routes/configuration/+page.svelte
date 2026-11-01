@@ -14,12 +14,9 @@
 
 	const projectJsonExample = `{
   "id": "1ff30495-1b2c-4641-9aff-e3495d72efc8",
-  "name": "Multi-Stage Rocket Demo",
+  "name": "My Project",
   "createdAt": "2026-02-26T04:16:02.923Z",
-  "notes": "Getting-started example. Start the Rocket Mission plugin to see live data.",
   "settings": {
-    "autoStartPlugins": ["rocket-mission"],
-    "tutorialExampleKind": "rocket",
     "dateTime": {
       "dateFormat": "iso",
       "timeFormat": "24h"
@@ -29,7 +26,11 @@
 
 	const folderStructure = `my-project/
 ├── project.json
-└── mcs.db`;
+├── mcs.db
+└── .mcs/
+    ├── meta.json
+    ├── media/      # imported assets, when present
+    └── renders/    # render jobs, when present`;
 </script>
 
 <svelte:head>
@@ -38,21 +39,27 @@
 
 <PageHeader
 	title="Configuration"
-	description="How MCS stores recent projects, project folders, and project-level settings."
+	description="Where MCS keeps runtime configuration and project data, and which settings belong in a project manifest."
 />
 
 <article class="doc-page">
 	<section>
 		<p class="doc-lead">
-			MCS keeps one global config file and one folder per project. By default the config lives at
-			<code>{`<cwd>/data/config.json`}</code>. Set <code>MCS_CONFIG_DIR</code> if you want it
-			somewhere else.
+			MCS keeps a runtime config file and a folder for each project. The config directory defaults to
+			<code>{`<cwd>/data/`}</code> and can be changed with <code>MCS_CONFIG_DIR</code>. When you open a
+			project with the MCS CLI, its config defaults to
+			<code>{`<project>/.mcs/runtime/`}</code>.
 		</p>
 	</section>
 
 	<section>
-		<h2>Global config</h2>
-		<CodeBlock lang="json" title="data/config.json" code={configExample} />
+		<h2>Share runtime settings</h2>
+		<p>Set <code>MCS_CONFIG_DIR</code> to the same absolute directory before opening several projects to share recent-project settings. Runtime config is separate from the project manifest and database.</p>
+	</section>
+
+	<section>
+		<h2>Recent projects config</h2>
+		<CodeBlock lang="json" title="config.json" code={configExample} />
 		<table>
 			<thead>
 				<tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
@@ -83,8 +90,9 @@
 		<h2>Project folders</h2>
 		<CodeBlock lang="text" title="Project folder layout" code={folderStructure} />
 		<p>
-			The manifest is plain JSON. MCS creates and manages the SQLite database. If you remove
-			<code>mcs.db</code>, MCS recreates it the next time that project opens.
+			The manifest is plain JSON. MCS creates and manages the SQLite database. Keep the manifest,
+			database, and format metadata together. Removing <code>mcs.db</code> removes the project's objects and
+			telemetry; MCS cannot reconstruct those records from the manifest.
 		</p>
 	</section>
 
@@ -100,16 +108,21 @@
 				<tr><td>name</td><td>string</td><td>Display name in the picker, header, and root object.</td></tr>
 				<tr><td>createdAt</td><td>ISO timestamp</td><td>Creation time.</td></tr>
 				<tr><td>notes</td><td>string</td><td>Optional description shown in the UI.</td></tr>
-				<tr><td>settings.autoStartPlugins</td><td>string[]</td><td>Simulation or connector ids (same as <code>/api/plugins/start</code>) to run when the project opens.</td></tr>
-				<tr><td>settings.tutorialExampleKind</td><td><code>rocket</code> | <code>ndvi</code> | <code>system</code></td><td>Optional. When set, the in-app tour uses copy matched to that example. PATCH with <code>null</code> to remove.</td></tr>
 				<tr><td>settings.dateTime.dateFormat</td><td><code>yyyy/m/d</code> | <code>short</code> | <code>iso</code></td><td>Date format override.</td></tr>
 				<tr><td>settings.dateTime.timeFormat</td><td><code>24h</code> | <code>12h</code></td><td>Time format override. Default is <code>24h</code>.</td></tr>
+				<tr><td>settings.telemetryRetentionDays</td><td>integer</td><td>Continuous telemetry history retention, from 1 to 3,650 days. The default is 30 days. Saved runs are kept separately.</td></tr>
 			</tbody>
 		</table>
 		<Callout type="info" title="Timestamp display">
-			When <code>timeFormat</code> is <code>24h</code>, “today” timestamps in compact grids are shown as <code>HHmm</code>
+			When <code>timeFormat</code> is <code>24h</code>, "today" timestamps in compact grids are shown as <code>HHmm</code>
 			(for example <code>1539</code>), while older items fall back to a short locale date.
 		</Callout>
+	</section>
+
+	<section>
+		<h2>Project data</h2>
+		<p>The project directory keeps its SQLite database, schema metadata, imported media, and render output together. A project backup includes the database and media, but leaves local runtime credentials out.</p>
+		<p>See <a href="/guides/backup-restore">backup and restore</a> before moving a project to another machine.</p>
 	</section>
 
 	<section>

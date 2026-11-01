@@ -1,0 +1,36 @@
+{
+  "name": "create-mcs",
+  "version": "0.1.0",
+  "description": "Create a local-first MCS telemetry project",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-mcs": "./bin/create-mcs.js"
+  },
+  "files": [
+    "bin",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "create",
+    "telemetry",
+    "mission-control",
+    "sensors"
+  ],
+  "homepage": "https://github.com/larspatkowa/MCS#readme",
+  "bugs": {
+    "url": "https://github.com/larspatkowa/MCS/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/larspatkowa/MCS.git",
+    "directory": "create-mcs"
+  },
+  "dependencies": {
+    "mcs-platform": "^0.1.0"
+  }
+}

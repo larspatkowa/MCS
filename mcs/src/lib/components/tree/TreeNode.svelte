@@ -1,16 +1,11 @@
 <script lang="ts">
-	import { selectedObjectId, currentProject } from '$lib/stores/project';
+	import { selectedObjectId } from '$lib/stores/project';
 	import { isDraggingObject, dragParentId } from '$lib/stores/drag.js';
 	import { getType } from '$lib/object-types/registry.js';
-	import {
-		multiSelectedIds,
-		toggleMultiSelect,
-		clearMultiSelect
-	} from '$lib/stores/explorerTree.js';
 	import type { ObjectTreeNode } from '$lib/objects';
 	import TreeNodeRecursive from './TreeNode.svelte';
 	import * as ContextMenu from '$lib/components/ui/context-menu';
-	import { LayoutDashboard, ChevronRight, ChevronDown, Layers } from '@lucide/svelte';
+	import { LayoutDashboard, ChevronRight, ChevronDown } from '@lucide/svelte';
 
 	let {
 		node,
@@ -33,23 +28,10 @@
 	const typeInfo = $derived(node ? getType(node.type) : undefined);
 	const IconComponent = $derived(typeInfo?.icon ?? LayoutDashboard);
 
-	const isMultiSelected = $derived($multiSelectedIds.has(node?.id ?? ''));
-	const hasAnyMultiSelect = $derived($multiSelectedIds.size > 0);
-
 	const showReorderZones = $derived($isDraggingObject && parentId != null && onReorder != null);
 
-	function handleClick(e: MouseEvent) {
-		if (e.ctrlKey || e.metaKey) {
-			// Toggle this node in multi-select
-			toggleMultiSelect(node.id);
-		} else if (e.shiftKey) {
-			// Shift-click: add without clearing others
-			toggleMultiSelect(node.id);
-		} else {
-			// Plain click: clear multi-select and select this node
-			clearMultiSelect();
-			select(node);
-		}
+	function handleClick() {
+		select(node);
 	}
 
 	function handleReorderDrop(e: DragEvent, insertBeforeId: string | null) {
@@ -60,30 +42,6 @@
 		if (draggedId && node?.id && onReorder) onReorder(draggedId, node.id, insertBeforeId);
 		dragParentId.set(null);
 	}
-
-	async function createOverlayFromSelected() {
-		const proj = $currentProject;
-		if (!proj) return;
-		const ids = [$selectedObjectId, ...$multiSelectedIds].filter(Boolean) as string[];
-		const distinct = [...new Set(ids)];
-		if (distinct.length < 2) return;
-		// Build series entries from the selected nodes (they're streams)
-		const series = distinct.map((id) => ({ streamId: id, field: 'value' }));
-		await fetch(`/api/projects/${proj.id}/objects`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				type: 'overlay-plot',
-				name: 'Multi-source Plot',
-				parentId: proj.id,
-				props: { series }
-			})
-		});
-		clearMultiSelect();
-		// Refresh tree
-		const { refreshExplorerTree } = await import('$lib/stores/explorerTree.js');
-		refreshExplorerTree();
-	}
 </script>
 
 {#if node}
@@ -91,9 +49,7 @@
 	{@const isExpanded = expandedIds.has(node.id)}
 	<ContextMenu.Root>
 		<ContextMenu.Trigger
-			class="tree-node {$selectedObjectId === node.id ? 'selected' : ''} {isMultiSelected
-				? 'multi-selected'
-				: ''}"
+			class="tree-node {$selectedObjectId === node.id ? 'selected' : ''}"
 			role="button"
 			tabindex={0}
 			draggable={node.type !== 'project'}
@@ -139,21 +95,10 @@
 		<ContextMenu.Content class="min-w-[10rem]">
 			<ContextMenu.Item
 				onSelect={() => {
-					clearMultiSelect();
 					select(node);
 				}}>Open</ContextMenu.Item
 			>
 			<ContextMenu.Separator />
-			{#if hasAnyMultiSelect}
-				<ContextMenu.Item onSelect={createOverlayFromSelected}>
-					<span style="display:flex;align-items:center;gap:0.4rem">
-						<Layers size={14} /> Create Overlay Plot
-					</span>
-				</ContextMenu.Item>
-				<ContextMenu.Item onSelect={() => clearMultiSelect()}>Clear Selection</ContextMenu.Item>
-				<ContextMenu.Separator />
-			{/if}
-			<ContextMenu.Item>Rename</ContextMenu.Item>
 			{#if node.type !== 'project'}
 				<ContextMenu.Item
 					onSelect={() => {
@@ -228,14 +173,6 @@
 	}
 	:global(.tree-node.selected) {
 		background: var(--mcs-surface-alt);
-	}
-	:global(.tree-node.multi-selected) {
-		background: color-mix(in srgb, var(--mcs-accent) 15%, transparent);
-		outline: 1px solid color-mix(in srgb, var(--mcs-accent) 40%, transparent);
-		outline-offset: -1px;
-	}
-	:global(.tree-node.multi-selected:hover) {
-		background: color-mix(in srgb, var(--mcs-accent) 22%, transparent);
 	}
 	.expand {
 		display: flex;

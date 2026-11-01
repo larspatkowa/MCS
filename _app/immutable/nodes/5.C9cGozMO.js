@@ -1,1 +1,0 @@
-import{r as t}from"../chunks/CifRVE5c.js";import{g as r}from"../chunks/BqUi0RrF.js";const o=()=>{const e=r();throw t(302,`/gallery/${e.typeId}/${e.variantId}`)},n=Object.freeze(Object.defineProperty({__proto__:null,load:o},Symbol.toStringTag,{value:"Module"}));export{n as universal};

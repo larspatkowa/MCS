@@ -3,13 +3,15 @@
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			authUser?: import('$lib/server/auth.js').AuthUser | null;
+			projectRole?: import('$lib/server/auth.js').ProjectRole | null;
+			serviceTokenProjectId?: string | null;
+		}
 		// interface PageData {}
 		// interface PageState {}
 		// interface Platform {}
 	}
 }
-
-declare module 'leaflet';
 
 export {};

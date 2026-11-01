@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { LinePlotProps } from '$lib/objects/types.js';
-	import { getSampleStreamSeries, isSampleStreamId } from '$lib/charts/sample-streams.js';
 	import { subscribeSSE } from '$lib/sse-manager.js';
 	import { currentProject } from '$lib/stores/project.js';
 	import {
@@ -10,9 +9,15 @@
 		formatTimestamp,
 		formatValue,
 		SERIES_COLORS,
-		nearestByX
+		nearestByX,
+		splitAtGaps
 	} from '$lib/charts/chart-utils.js';
 	import ErrorBoundary from '../ErrorBoundary.svelte';
+	import { timeConductorState } from '$lib/stores/timeline.js';
+	import { replayRunId, replaySamplesForStream } from '$lib/stores/run.js';
+	import { replayClock } from '$lib/stores/replay-session.js';
+	import { fetchStreamSamples } from '$lib/charts/useStreamData.js';
+	import { mergeTimeOrderedSamples } from '$lib/charts/time-alignment.js';
 
 	let { objectId, props } = $props<{ objectId: string; props: LinePlotProps }>();
 
@@ -24,53 +29,206 @@
 	);
 	const showGrid = $derived(props.showGrid ?? true);
 	const colors = $derived(props.colors?.length ? props.colors : [...SERIES_COLORS]);
-	const pollInterval = $derived(props.pollInterval ?? 5000);
 	const limitBands = $derived(props.limitBands);
-
-	const WINDOW_SEC = 120;
+	const windowSec = $derived(Math.max(1, Number(props.windowSec) || 30));
+	const pollInterval = $derived(
+		Math.max(100, Math.min(60_000, Number(props.pollInterval) || 1000))
+	);
 
 	// Container
 	let containerEl = $state<HTMLDivElement | null>(null);
 	let w = $state(600);
 	let h = $state(300);
 
+	let legendH = $state(0);
+	const svgH = $derived(Math.max(40, h - legendH));
+
+	// Units come from the plot's own props first, then from stream metadata.
+	let streamUnits = $state<Record<string, string>>({});
+	const seriesUnits = $derived(
+		dataSources.map((src: string, i: number) => props.units?.[i] || streamUnits[src] || '')
+	);
+	const unitGroups = $derived([...new Set(seriesUnits.filter(Boolean))] as string[]);
+	// Series in the first unit (or without a unit) use the left axis; the
+	// second unit gets its own right axis so different units never share a scale.
+	const seriesAxis = $derived(
+		seriesUnits.map((unit: string) => (unit && unitGroups.indexOf(unit) > 0 ? 1 : 0))
+	);
+	const hasRightAxis = $derived(unitGroups.length > 1);
+
 	// Margins — scale down in small containers
 	const ML = $derived(w < 200 ? Math.max(20, w * 0.2) : 54);
-	const MR = $derived(w < 200 ? 6 : 14);
-	const MT = $derived(h < 150 ? 4 : 10);
-	const MB = $derived(h < 150 ? Math.max(16, h * 0.15) : 38);
+	const MR = $derived(hasRightAxis ? ML + 6 : w < 200 ? 6 : 14);
+	const MT = $derived(svgH < 150 ? 4 : 10);
+	const MB = $derived(svgH < 150 ? Math.max(16, svgH * 0.15) : 38);
 	const pw = $derived(Math.max(10, w - ML - MR));
-	const ph = $derived(Math.max(10, h - MT - MB));
+	const ph = $derived(Math.max(10, svgH - MT - MB));
 
 	// Data
-	type Pt = { timestamp: number; value: number };
+	type Pt = { timestamp: number; value: number; eventId?: number };
 	let allSeries = $state<Pt[][]>([]);
 
-	// Ring buffer for live SSE streams (non-sample). Plain object — not $state so
+	// Ring buffer for live SSE streams. Plain object — not $state so
 	// SSE callbacks updating it don't cause effect re-runs; fetchData() is called
 	// explicitly from the SSE handler instead.
-	const LIVE_MAX_PTS = 200;
+	const LIVE_MAX_PTS = 12_000;
+	const LIVE_INCREMENTAL_MAX_PTS = 2_000;
+	const MAX_RENDER_PTS = 1_200;
 	const liveBuffer: Record<string, Pt[]> = {};
+	const latestEventIdBySource: Record<string, number> = {};
+	let renderTimer: ReturnType<typeof setTimeout> | null = null;
+	let zoomLevel = $state(1);
+
+	function decimate(points: Pt[], maxPoints: number): Pt[] {
+		if (points.length <= maxPoints) return points.slice();
+		const bucketCount = Math.max(1, Math.floor((maxPoints - 2) / 2));
+		const bucketSize = (points.length - 1) / bucketCount;
+		const result: Pt[] = [points[0]];
+		for (let bucket = 0; bucket < bucketCount; bucket++) {
+			const start = Math.floor(bucket * bucketSize);
+			const end = Math.min(points.length - 1, Math.floor((bucket + 1) * bucketSize) + 1);
+			if (end <= start) continue;
+			let min = points[start];
+			let max = points[start];
+			for (let index = start + 1; index < end; index++) {
+				if (points[index].value < min.value) min = points[index];
+				if (points[index].value > max.value) max = points[index];
+			}
+			if (min.timestamp <= max.timestamp) result.push(min, max);
+			else result.push(max, min);
+		}
+		result.push(points[points.length - 1]);
+		return result;
+	}
 
 	function fetchData() {
+		const runReplayActive = Boolean($replayRunId);
 		allSeries = dataSources.map((src: string) => {
-			if (isSampleStreamId(src)) {
-				return getSampleStreamSeries(src, { windowSec: WINDOW_SEC, points: 150 });
+			if (runReplayActive) {
+				const replayPoints = replaySamplesForStream(src, { to: $replayClock.playhead }) ?? [];
+				// Saved runs can hold far more samples than the plot has pixels.
+				return decimate(
+					replayPoints.map((point) => ({ timestamp: point.timestamp, value: point.value })),
+					MAX_RENDER_PTS
+				);
 			}
-			return liveBuffer[src] ?? [];
+			const history = liveBuffer[src] ?? [];
+			const visible =
+				$replayClock.mode !== 'live'
+					? history.filter((point) => point.timestamp <= $replayClock.playhead)
+					: history;
+			return decimate(visible, MAX_RENDER_PTS);
 		});
+	}
+
+	function scheduleFetchData() {
+		if (renderTimer !== null) return;
+		renderTimer = setTimeout(() => {
+			renderTimer = null;
+			fetchData();
+		}, 50);
+	}
+
+	function numericValue(values: Record<string, unknown>): number {
+		if (values.value !== undefined) return Number(values.value);
+		return (
+			Object.values(values)
+				.map(Number)
+				.find((value) => !isNaN(value)) ?? NaN
+		);
+	}
+
+	async function refreshLiveBuffers(
+		projectId: string,
+		sources: string[],
+		signal: AbortSignal
+	): Promise<void> {
+		if (sources.length === 0) return;
+		try {
+			const results = await Promise.all(
+				sources.map(async (source) => {
+					const existing = liveBuffer[source] ?? [];
+					const afterEventId = latestEventIdBySource[source];
+					const points = (
+						await fetchStreamSamples(projectId, source, {
+							afterEventId,
+							includeEventIds: afterEventId === undefined,
+							limit: afterEventId === undefined ? LIVE_MAX_PTS : LIVE_INCREMENTAL_MAX_PTS
+						})
+					)
+						.map((sample) => ({
+							timestamp: sample.timestamp,
+							value: typeof sample.value === 'number' ? sample.value : NaN,
+							...(sample.eventId === undefined ? {} : { eventId: sample.eventId })
+						}))
+						.filter((point) => !isNaN(point.value));
+					return { source, points, existing };
+				})
+			);
+
+			for (const { source, points, existing } of results) {
+				// Merge by source event ID so late samples and SSE/REST overlap remain
+				// deterministic even when event time moves backwards.
+				const current = liveBuffer[source] ?? existing;
+				liveBuffer[source] = mergeTimeOrderedSamples(current, points, LIVE_MAX_PTS);
+				for (const point of points) {
+					if (point.eventId !== undefined) {
+						latestEventIdBySource[source] = Math.max(
+							latestEventIdBySource[source] ?? 0,
+							point.eventId
+						);
+					}
+				}
+			}
+			if (!signal.aborted) fetchData();
+		} catch {
+			// The stream remains live through SSE if a refresh is unavailable.
+		}
 	}
 
 	// Domain computation
 	const allPts = $derived(allSeries.flat());
+	const emptyRangeStart = $derived(
+		$timeConductorState.mode === 'fixed'
+			? $timeConductorState.fixedStart
+			: Date.now() / 1000 - windowSec
+	);
+	const emptyRangeEnd = $derived(
+		$timeConductorState.mode === 'fixed' ? $timeConductorState.fixedEnd : Date.now() / 1000
+	);
+	const liveLatest = $derived(
+		allPts.reduce((latest, point) => (point.timestamp > latest ? point.timestamp : latest), 0)
+	);
 	const tMin = $derived(
-		allPts.length ? Math.min(...allPts.map((p) => p.timestamp)) : Date.now() / 1000 - WINDOW_SEC
+		$timeConductorState.mode === 'fixed'
+			? $timeConductorState.fixedStart
+			: allPts.length
+				? liveLatest - Math.max(0.25, windowSec / zoomLevel)
+				: emptyRangeStart
 	);
 	const tMax = $derived(
-		allPts.length ? Math.max(...allPts.map((p) => p.timestamp)) : Date.now() / 1000
+		$timeConductorState.mode === 'fixed'
+			? $timeConductorState.fixedEnd
+			: allPts.length
+				? liveLatest
+				: emptyRangeEnd
 	);
-	const rawValueMin = $derived(allPts.length ? Math.min(...allPts.map((p) => p.value)) : 0);
-	const rawValueMax = $derived(allPts.length ? Math.max(...allPts.map((p) => p.value)) : 100);
+	function axisRange(axis: 0 | 1): [number, number] {
+		const pts = allSeries.filter((_, i) => (seriesAxis[i] ?? 0) === axis).flat();
+		const visible = pts.filter((point) => point.timestamp >= tMin && point.timestamp <= tMax);
+		const range = visible.length ? visible : pts;
+		if (!range.length) return [0, 100];
+		let lo = Infinity;
+		let hi = -Infinity;
+		for (const point of range) {
+			if (point.value < lo) lo = point.value;
+			if (point.value > hi) hi = point.value;
+		}
+		return [lo, hi];
+	}
+	const leftRange = $derived(axisRange(0));
+	const rawValueMin = $derived(leftRange[0]);
+	const rawValueMax = $derived(leftRange[1]);
 	// Expand domain to include limit band values if set
 	const domainMin = $derived.by(() => {
 		let m = props.yAxis?.min ?? rawValueMin;
@@ -87,21 +245,42 @@
 		return props.yAxis?.max ?? m + pad;
 	});
 
+	const rightDomain = $derived.by((): [number, number] => {
+		const [lo, hi] = axisRange(1);
+		const min = props.yAxisRight?.min ?? lo;
+		const max = props.yAxisRight?.max ?? hi;
+		const pad = (max - min) * 0.06 || 1;
+		return [props.yAxisRight?.min ?? min - pad, props.yAxisRight?.max ?? max + pad];
+	});
+
 	const xScale = $derived(linearScale([tMin, tMax], [0, pw]));
 	const yScale = $derived(linearScale([domainMin, domainMax], [ph, 0]));
+	const yScaleRight = $derived(linearScale(rightDomain, [ph, 0]));
+	const scaleFor = (i: number) => (seriesAxis[i] === 1 ? yScaleRight : yScale);
 
 	const xTickCount = $derived(Math.max(2, Math.floor(pw / 90)));
 	const yTickCount = $derived(Math.max(2, Math.floor(ph / 38)));
 	const xTicks = $derived(niceTicks(tMin, tMax, xTickCount));
 	const yTicks = $derived(niceTicks(domainMin, domainMax, yTickCount));
+	const yTicksRight = $derived(
+		hasRightAxis ? niceTicks(rightDomain[0], rightDomain[1], yTickCount) : []
+	);
+	const leftAxisTitle = $derived(props.yAxis?.label || unitGroups[0] || '');
+	const rightAxisTitle = $derived(props.yAxisRight?.label || unitGroups.slice(1).join(' · '));
 
+	// Each contiguous run is its own subpath, so no line is drawn across a gap.
 	const paths = $derived(
-		allSeries.map((s) =>
-			buildLinePath(
-				s.map((p) => ({ x: xScale(p.timestamp), y: yScale(p.value) })),
-				interpolation
-			)
-		)
+		allSeries.map((s, i) => {
+			const scale = scaleFor(i);
+			return splitAtGaps(s)
+				.map((run) =>
+					buildLinePath(
+						run.map((p) => ({ x: xScale(p.timestamp), y: scale(p.value) })),
+						interpolation
+					)
+				)
+				.join('');
+		})
 	);
 
 	// Hover state
@@ -114,7 +293,11 @@
 			if (!series.length || hoverTimestamp === null) return null;
 			const idx = nearestByX(series, hoverTimestamp);
 			if (idx < 0) return null;
-			return { value: series[idx].value, color: colors[i % colors.length] };
+			return {
+				value: series[idx].value,
+				color: colors[i % colors.length],
+				axis: seriesAxis[i] ?? 0
+			};
 		})
 	);
 
@@ -127,15 +310,46 @@
 		(seriesNames.length ? seriesNames : dataSources).map((name: string, i: number) => ({
 			name: name || `Series ${i + 1}`,
 			val: hoverValues[i],
+			unit: seriesUnits[i] ?? '',
 			color: colors[i % colors.length]
 		}))
 	);
 	const tooltipH = $derived(26 + tooltipRows.length * 17 + 6);
+	const zoomLabel = $derived(`${zoomLevel}×`);
+
+	function changeZoom(direction: 1 | -1): void {
+		zoomLevel = Math.max(1, Math.min(8, zoomLevel * (direction > 0 ? 2 : 0.5)));
+	}
+
+	function resetView(): void {
+		zoomLevel = 1;
+	}
+
+	function onWheel(e: WheelEvent): void {
+		e.preventDefault();
+		changeZoom(e.deltaY < 0 ? 1 : -1);
+	}
 
 	function onPointerMove(e: PointerEvent) {
-		const rect = (e.currentTarget as SVGRectElement).getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
+		const target = e.currentTarget as SVGRectElement;
+		let x: number;
+		let y: number;
+		const matrix = target.getScreenCTM();
+		if (matrix) {
+			try {
+				const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix.inverse());
+				x = point.x;
+				y = point.y;
+			} catch {
+				const rect = target.getBoundingClientRect();
+				x = rect.width ? ((e.clientX - rect.left) * pw) / rect.width : -1;
+				y = rect.height ? ((e.clientY - rect.top) * ph) / rect.height : -1;
+			}
+		} else {
+			const rect = target.getBoundingClientRect();
+			x = rect.width ? ((e.clientX - rect.left) * pw) / rect.width : -1;
+			y = rect.height ? ((e.clientY - rect.top) * ph) / rect.height : -1;
+		}
 		hoverX = x >= 0 && x <= pw && y >= 0 && y <= ph ? x : null;
 	}
 
@@ -143,74 +357,165 @@
 		hoverX = null;
 	}
 
-	// SSE subscription for non-sample (plugin) streams
+	// SSE subscription for live streams
 	$effect(() => {
+		if ($replayRunId) {
+			$replayClock.playhead;
+			fetchData();
+			return;
+		}
 		const proj = $currentProject;
 		const sources = dataSources;
+		const mode = $timeConductorState.mode;
 		if (!proj || !sources.length) return;
 
 		// Drop stale buffers for streams that are no longer in dataSources
-		const active = new Set(sources.filter((s: string) => !isSampleStreamId(s)));
+		const active = new Set<string>(sources);
 		for (const key of Object.keys(liveBuffer)) {
-			if (!active.has(key)) delete liveBuffer[key];
+			if (!active.has(key)) {
+				delete liveBuffer[key];
+				delete latestEventIdBySource[key];
+			}
 		}
 
-		// Seed live buffers from historical samples fetched from the REST API
-		for (const src of active) {
-			if (liveBuffer[src as string]?.length) continue; // already seeded
-			const sid = encodeURIComponent(src as string);
-			fetch(`/api/projects/${proj.id}/streams/${sid}/samples?limit=${LIVE_MAX_PTS}`)
-				.then((r) => (r.ok ? r.json() : { data: [] }))
-				.then((body: { data?: { timestamp: number; value?: number; [k: string]: unknown }[] }) => {
-					const pts: Pt[] = (body.data ?? [])
-						.map((s) => ({
-							timestamp: s.timestamp,
-							value: typeof s.value === 'number' ? s.value : NaN
-						}))
-						.filter((p) => !isNaN(p.value));
-					if (pts.length) {
-						liveBuffer[src as string] = pts;
-						fetchData();
-					}
-				})
-				.catch(() => {});
-		}
+		if (mode === 'fixed') return;
 
 		const unsubs: (() => void)[] = [];
 		for (const src of sources) {
-			if (!isSampleStreamId(src)) {
-				const unsub = subscribeSSE(proj.id, src, (event) => {
-					if (!('values' in event)) return;
-					const v = event.values as Record<string, unknown>;
-					let val = NaN;
-					if (v.value !== undefined) {
-						val = Number(v.value);
-					} else {
-						const n = Object.values(v)
-							.map(Number)
-							.find((x) => !isNaN(x));
-						if (n !== undefined) val = n;
+			const unsub = subscribeSSE(proj.id, src, (event) => {
+				if (!('values' in event)) return;
+				const samples = event.samples ?? [
+					{
+						timestamp: event.timestamp,
+						values: event.values,
+						eventId: event.eventId
 					}
-					if (isNaN(val)) return;
-					const buf = liveBuffer[src] ?? [];
-					buf.push({ timestamp: event.timestamp, value: val });
-					if (buf.length > LIVE_MAX_PTS) buf.splice(0, buf.length - LIVE_MAX_PTS);
-					liveBuffer[src] = buf;
-					fetchData(); // update chart immediately on each new point
-				});
-				unsubs.push(unsub);
-			}
+				];
+				const incoming: Pt[] = [];
+				for (const sample of samples) {
+					const value = numericValue(sample.values);
+					if (!isNaN(value)) {
+						incoming.push({
+							timestamp: sample.timestamp,
+							value,
+							...(sample.eventId === undefined ? {} : { eventId: sample.eventId })
+						});
+					}
+				}
+				liveBuffer[src] = mergeTimeOrderedSamples(liveBuffer[src] ?? [], incoming, LIVE_MAX_PTS);
+				for (const point of incoming) {
+					if (point.eventId !== undefined) {
+						latestEventIdBySource[src] = Math.max(latestEventIdBySource[src] ?? 0, point.eventId);
+					}
+				}
+				scheduleFetchData();
+			});
+			unsubs.push(unsub);
 		}
+
 		return () => {
 			for (const u of unsubs) u();
 		};
 	});
 
-	// Polling (sample streams)
+	// Replay mode reads the selected fixed window instead of accepting live SSE updates.
 	$effect(() => {
+		const proj = $currentProject;
+		const sources = dataSources;
+		const state = $timeConductorState;
+		if (!proj || state.mode !== 'fixed' || $replayRunId || sources.length === 0) return;
+
+		const controller = new AbortController();
+		const timer = setTimeout(() => {
+			Promise.all(
+				sources.map(async (source: string) => {
+					const points = (
+						await fetchStreamSamples(proj.id, source, {
+							from: state.fixedStart,
+							to: state.fixedEnd,
+							limit: 5000,
+							includeEventIds: true
+						})
+					)
+						.map((sample) => ({
+							timestamp: sample.timestamp,
+							value: typeof sample.value === 'number' ? sample.value : NaN,
+							...(sample.eventId === undefined ? {} : { eventId: sample.eventId })
+						}))
+						.filter((point) => Number.isFinite(point.value));
+					return { source, points };
+				})
+			)
+				.then((series) => {
+					if (controller.signal.aborted) return;
+					for (const { source, points } of series) {
+						liveBuffer[source] = mergeTimeOrderedSamples([], points, 5000);
+					}
+					fetchData();
+				})
+				.catch((error) => {
+					if (!controller.signal.aborted) console.error('Failed to load replay window', error);
+				});
+		}, 120);
+
+		return () => {
+			clearTimeout(timer);
+			controller.abort();
+		};
+	});
+
+	// Continuous-history playback shares the same playhead as saved-run replay.
+	$effect(() => {
+		if ($replayClock.mode === 'live' || $replayRunId) return;
+		$replayClock.playhead;
 		fetchData();
-		const id = setInterval(fetchData, pollInterval);
-		return () => clearInterval(id);
+	});
+
+	// Seed the live buffer, then poll at the configured interval as a fallback for
+	// reconnects or streams that do not deliver browser-side SSE events.
+	$effect(() => {
+		const proj = $currentProject;
+		const sources = dataSources;
+		const mode = $timeConductorState.mode;
+		if ($replayRunId) return;
+		const controller = new AbortController();
+		let refreshing = false;
+		const refresh = () => {
+			if (!proj || mode === 'fixed' || !sources.length || refreshing) return;
+			refreshing = true;
+			void refreshLiveBuffers(proj.id, sources, controller.signal).finally(() => {
+				refreshing = false;
+			});
+		};
+		refresh();
+		fetchData();
+		const interval =
+			proj && mode !== 'fixed' && sources.length ? setInterval(refresh, pollInterval) : null;
+		return () => {
+			controller.abort();
+			if (interval !== null) clearInterval(interval);
+		};
+	});
+
+	// Stream metadata supplies units when the plot does not name them.
+	$effect(() => {
+		const proj = $currentProject;
+		if (!proj || !dataSources.length) return;
+		const controller = new AbortController();
+		fetch(`/api/projects/${encodeURIComponent(proj.id)}/streams`, { signal: controller.signal })
+			.then((response) => (response.ok ? response.json() : []))
+			.then((list: { id: string; metadata?: Record<string, unknown> }[]) => {
+				const units: Record<string, string> = {};
+				for (const stream of list) {
+					const unit = stream.metadata?.units ?? stream.metadata?.unit;
+					if (typeof unit === 'string' && unit) units[stream.id] = unit;
+				}
+				streamUnits = units;
+			})
+			.catch(() => {
+				// Without metadata every series stays on the left axis.
+			});
+		return () => controller.abort();
 	});
 
 	// ResizeObserver
@@ -292,8 +597,41 @@
 <div class="view-root" bind:this={containerEl}>
 	<ErrorBoundary>
 		{#if w > 0 && h > 0}
+			<div class="plot-controls" aria-label="Plot controls" style:right="{MR + 4}px">
+				<button
+					type="button"
+					aria-label="Zoom out"
+					disabled={zoomLevel <= 1}
+					onclick={() => changeZoom(-1)}
+				>
+					Zoom out
+				</button>
+				<span>{zoomLabel}</span>
+				<button
+					type="button"
+					aria-label="Zoom in"
+					disabled={zoomLevel >= 8}
+					onclick={() => changeZoom(1)}
+				>
+					Zoom in
+				</button>
+				<button
+					type="button"
+					aria-label="Reset plot view"
+					disabled={zoomLevel === 1}
+					onclick={resetView}
+				>
+					Reset
+				</button>
+			</div>
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<svg width={w} height={h} style="display:block;overflow:visible;cursor:crosshair">
+			<svg
+				width={w}
+				height={svgH}
+				role="img"
+				aria-label="Line plot"
+				style="display:block;overflow:visible;cursor:crosshair"
+			>
 				<defs>
 					<clipPath id={clipId}>
 						<rect x={0} y={0} width={pw} height={ph} />
@@ -311,6 +649,7 @@
 						fill="transparent"
 						onpointermove={onPointerMove}
 						onpointerleave={onPointerLeave}
+						onwheel={onWheel}
 					/>
 
 					<!-- Limit bands (behind grid) -->
@@ -323,14 +662,14 @@
 								y={Math.min(y1, y2)}
 								width={pw}
 								height={Math.abs(y1 - y2)}
-								fill="rgba(239,68,68,0.12)"
+								fill="color-mix(in srgb, var(--mcs-danger) 12%, transparent)"
 							/>
 							<line
 								x1={0}
 								x2={pw}
 								y1={clampY(limitBands.redHigh, 0)}
 								y2={clampY(limitBands.redHigh, 0)}
-								stroke="rgba(239,68,68,0.55)"
+								stroke="color-mix(in srgb, var(--mcs-danger) 60%, transparent)"
 								stroke-width="1"
 								stroke-dasharray="6 3"
 							/>
@@ -344,14 +683,14 @@
 								y={Math.min(y1, y2)}
 								width={pw}
 								height={Math.abs(y1 - y2)}
-								fill="rgba(245,158,11,0.1)"
+								fill="color-mix(in srgb, var(--mcs-warning) 10%, transparent)"
 							/>
 							<line
 								x1={0}
 								x2={pw}
 								y1={clampY(limitBands.yellowHigh, 0)}
 								y2={clampY(limitBands.yellowHigh, 0)}
-								stroke="rgba(245,158,11,0.55)"
+								stroke="color-mix(in srgb, var(--mcs-warning) 60%, transparent)"
 								stroke-width="1"
 								stroke-dasharray="6 3"
 							/>
@@ -364,14 +703,14 @@
 								y={Math.min(y1, y2)}
 								width={pw}
 								height={Math.abs(y1 - y2)}
-								fill="rgba(239,68,68,0.12)"
+								fill="color-mix(in srgb, var(--mcs-danger) 12%, transparent)"
 							/>
 							<line
 								x1={0}
 								x2={pw}
 								y1={clampY(limitBands.redLow, ph)}
 								y2={clampY(limitBands.redLow, ph)}
-								stroke="rgba(239,68,68,0.55)"
+								stroke="color-mix(in srgb, var(--mcs-danger) 60%, transparent)"
 								stroke-width="1"
 								stroke-dasharray="6 3"
 							/>
@@ -385,14 +724,14 @@
 								y={Math.min(y1, y2)}
 								width={pw}
 								height={Math.abs(y1 - y2)}
-								fill="rgba(245,158,11,0.1)"
+								fill="color-mix(in srgb, var(--mcs-warning) 10%, transparent)"
 							/>
 							<line
 								x1={0}
 								x2={pw}
 								y1={clampY(limitBands.yellowLow, ph)}
 								y2={clampY(limitBands.yellowLow, ph)}
-								stroke="rgba(245,158,11,0.55)"
+								stroke="color-mix(in srgb, var(--mcs-warning) 60%, transparent)"
 								stroke-width="1"
 								stroke-dasharray="6 3"
 							/>
@@ -480,7 +819,7 @@
 							<line x1={hoverX} y1={0} x2={hoverX} y2={ph} class="crosshair" />
 							{#each hoverValues as hv, i}
 								{#if hv !== null}
-									{@const cy = yScale(hv.value)}
+									{@const cy = (hv.axis === 1 ? yScaleRight : yScale)(hv.value)}
 									{#if cy >= -4 && cy <= ph + 4}
 										<circle
 											cx={hoverX}
@@ -501,7 +840,12 @@
 					{#each xTicks as tx}
 						{@const lx = xScale(tx)}
 						{#if lx >= 0 && lx <= pw}
-							<text x={lx} y={ph + 15} class="axis-label" text-anchor="middle">
+							<text
+								x={lx}
+								y={ph + 15}
+								class="axis-label"
+								text-anchor={lx > pw - 28 + MR ? 'end' : lx < 28 - ML ? 'start' : 'middle'}
+							>
 								{formatTimestamp(tx, tMax - tMin)}
 							</text>
 						{/if}
@@ -522,7 +866,7 @@
 							</text>
 						{/if}
 					{/each}
-					{#if props.yAxis?.label}
+					{#if leftAxisTitle}
 						<text
 							x={-(ML - 14)}
 							y={ph / 2}
@@ -530,8 +874,32 @@
 							text-anchor="middle"
 							transform="rotate(-90, {-(ML - 14)}, {ph / 2})"
 						>
-							{props.yAxis.label}
+							{leftAxisTitle}
 						</text>
+					{/if}
+
+					<!-- Right Y Axis: series in a second unit -->
+					{#if hasRightAxis}
+						<line x1={pw} y1={0} x2={pw} y2={ph} class="axis-line" />
+						{#each yTicksRight as ty}
+							{@const ly = yScaleRight(ty)}
+							{#if ly >= 0 && ly <= ph}
+								<text x={pw + 7} y={ly + 4} class="axis-label" text-anchor="start">
+									{formatValue(ty, Math.abs(ty) < 10 ? 2 : 1)}
+								</text>
+							{/if}
+						{/each}
+						{#if rightAxisTitle}
+							<text
+								x={pw + MR - 12}
+								y={ph / 2}
+								class="axis-title"
+								text-anchor="middle"
+								transform="rotate(90, {pw + MR - 12}, {ph / 2})"
+							>
+								{rightAxisTitle}
+							</text>
+						{/if}
 					{/if}
 				</g>
 
@@ -547,7 +915,9 @@
 							<rect x={8} y={ty - 7} width={7} height={7} fill={row.color} rx={1.5} />
 							<text x={19} y={ty} class="tooltip-label">{row.name}</text>
 							<text x={TOOLTIP_W - 8} y={ty} class="tooltip-value" text-anchor="end">
-								{row.val !== null ? formatValue(row.val.value, 2) : '—'}
+								{row.val !== null
+									? `${formatValue(row.val.value, 2)}${row.unit ? ` ${row.unit}` : ''}`
+									: '—'}
 							</text>
 						{/each}
 					</g>
@@ -556,7 +926,7 @@
 
 			<!-- Legend -->
 			{#if allSeries.length > 1}
-				<div class="legend">
+				<div class="legend" bind:clientHeight={legendH}>
 					{#each seriesNames.length ? seriesNames : dataSources as name, i}
 						<span class="legend-item">
 							<svg width="18" height="10" style="overflow:visible;flex-shrink:0">
@@ -570,6 +940,9 @@
 								/>
 							</svg>
 							{name || `Series ${i + 1}`}
+							{#if hasRightAxis && seriesAxis[i] === 1}
+								<span class="legend-axis">right axis</span>
+							{/if}
 						</span>
 					{/each}
 				</div>
@@ -587,6 +960,38 @@
 		display: flex;
 		flex-direction: column;
 		container-type: inline-size;
+	}
+
+	.plot-controls {
+		position: absolute;
+		top: 4px;
+		right: 6px;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		gap: 3px;
+		font: 600 9px/1 var(--mcs-font-mono);
+		color: var(--mcs-text-muted);
+	}
+
+	.plot-controls button {
+		padding: 3px 5px;
+		border: 1px solid var(--mcs-border);
+		border-radius: 2px;
+		background: var(--mcs-surface);
+		color: var(--mcs-text-muted);
+		font: inherit;
+		cursor: pointer;
+	}
+
+	.plot-controls button:hover:not(:disabled) {
+		color: var(--mcs-text);
+		border-color: var(--mcs-text-muted);
+	}
+
+	.plot-controls button:disabled {
+		cursor: default;
+		opacity: 0.45;
 	}
 
 	.grid-line {
@@ -662,6 +1067,10 @@
 		gap: 0.5rem 1rem;
 		padding: 0 0 6px 8px;
 		pointer-events: none;
+	}
+
+	.legend-axis {
+		opacity: 0.75;
 	}
 
 	.legend-item {

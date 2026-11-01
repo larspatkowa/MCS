@@ -11,7 +11,6 @@
 	} from '$lib/stores/project';
 	import { sidebarLeftVisible, sidebarRightVisible } from '$lib/stores/sidebars';
 	import { PanelLeftOpen, PanelRightOpen } from '@lucide/svelte';
-	import { getGalleryObject } from '$lib/gallery/resolver.js';
 	import { page } from '$app/stores';
 	import { get } from 'svelte/store';
 
@@ -41,16 +40,6 @@
 
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort('timeout'), 10000);
-
-		// Gallery: resolve from in-memory map, no API
-		if (proj.id === 'gallery') {
-			const obj = getGalleryObject(id);
-			selectedObject.set(obj ?? null);
-			selectedObjectLoading.set(false);
-			selectedObjectError.set(obj ? null : 'Object not found');
-			clearTimeout(timeout);
-			return;
-		}
 
 		selectedObjectError.set(null);
 		selectedObjectLoading.set(true);
@@ -105,7 +94,7 @@
 	});
 </script>
 
-<div class="center-view" data-tutorial="center-view">
+<div class="center-view">
 	{#if !isDisplayMode}
 		<div class="center-view-header">
 			{#if !$sidebarLeftVisible}
@@ -139,7 +128,7 @@
 			{/if}
 		</div>
 	{/if}
-	<div class="center-view-content" data-tutorial="center-view-content">
+	<div class="center-view-content">
 		<CenterContent />
 	</div>
 </div>

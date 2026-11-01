@@ -10,10 +10,14 @@ node_modules
 
 # Editor
 **/.vscode/
+*.svelte.save
+*~
 
 # Cursor / local tooling
 .cursor
 .playwright-mcp
+**/.playwright-cli
+.claude/
 
 # SvelteKit/Vite
 **/.svelte-kit
@@ -28,4 +32,12 @@ mcs/data
 # Local outputs
 output
 docs-site/test-results
-
+mcs/test-results
+mcs/.mcs-e2e
+mcs/output
+mcs/svelte-check.log
+/test-results
+/_app
+/assets
+/index.html
+/robots.txt

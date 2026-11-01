@@ -12,7 +12,8 @@
 		}
 
 		theme = value;
-		document.documentElement.dataset.theme = value;
+		document.documentElement.classList.toggle('theme-light', value === 'light');
+		document.documentElement.classList.toggle('theme-dark', value === 'dark');
 		document.documentElement.style.colorScheme = value;
 		localStorage.setItem(storageKey, value);
 	}
@@ -22,76 +23,55 @@
 	}
 
 	if (browser) {
-		const currentTheme = document.documentElement.dataset.theme;
-		theme = currentTheme === 'dark' ? 'dark' : 'light';
+		theme = document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light';
 	}
 </script>
 
 <button
 	type="button"
 	class="theme-toggle"
-	aria-label="Toggle theme"
+	aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+	title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
 	aria-pressed={theme === 'dark'}
 	onclick={toggleTheme}
 >
-	<span class="theme-track" aria-hidden="true">
-		<span class="theme-thumb"></span>
-	</span>
-	<span class="theme-label">Theme</span>
+	<svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+		{#if theme === 'dark'}
+			<circle cx="10" cy="10" r="3.2" />
+			<path d="M10 1.8v2M10 16.2v2M18.2 10h-2M3.8 10h-2m14-5.8-1.4 1.4M5.6 14.4l-1.4 1.4m11.6 0-1.4-1.4M5.6 5.6 4.2 4.2" />
+		{:else}
+			<path d="M16.5 12.1A6.8 6.8 0 0 1 7.9 3.5a6.8 6.8 0 1 0 8.6 8.6Z" />
+		{/if}
+	</svg>
 </button>
 
 <style>
 	.theme-toggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.65rem;
-		padding: 0.4rem 0.55rem;
+		display: inline-grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		padding: 0;
 		border: 1px solid var(--docs-border);
-		background: color-mix(in srgb, var(--docs-surface-strong) 80%, transparent);
-		color: var(--docs-text-muted);
+		border-radius: var(--docs-radius);
+		background: var(--docs-surface-strong);
+		color: var(--docs-text);
 		font: inherit;
-		font-size: 0.86rem;
 		cursor: pointer;
-		transition:
-			border-color 160ms ease,
-			background-color 160ms ease,
-			color 160ms ease;
+		transition: background-color 160ms ease, border-color 160ms ease;
 	}
 
 	.theme-toggle:hover {
-		color: var(--docs-text);
 		border-color: var(--docs-border-strong);
-		background: color-mix(in srgb, var(--docs-surface-strong) 92%, transparent);
+		background: var(--docs-surface);
 	}
 
-	.theme-toggle:focus-visible {
-		outline: 2px solid var(--docs-accent);
-		outline-offset: 2px;
-	}
-
-	.theme-track {
-		position: relative;
-		width: 2.5rem;
-		height: 1.4rem;
-		background: color-mix(in srgb, var(--docs-surface-raised) 86%, var(--docs-border));
-		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--docs-border) 82%, transparent);
-	}
-
-	.theme-thumb {
-		position: absolute;
-		top: 0.16rem;
-		left: 0.18rem;
-		width: 1.08rem;
-		height: 1.08rem;
-		background: var(--docs-accent);
-		transition: transform 180ms ease;
-	}
-
-	[aria-pressed='true'] .theme-thumb {
-		transform: translateX(1.08rem);
-	}
-
-	.theme-label {
-		font-weight: 500;
+	.theme-toggle svg {
+		width: 1rem;
+		height: 1rem;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.5;
 	}
 </style>

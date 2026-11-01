@@ -3,7 +3,7 @@
  * Tests the full user workflow: project creation, data ingestion,
  * object management, view rendering, API contract, and UI interactions.
  *
- * Requires a running MCS dev server (npm run dev) at http://localhost:6000.
+ * Playwright starts an isolated preview server and project store.
  */
 
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
@@ -14,7 +14,7 @@ import { deleteProject, takeScreenshot } from './e2e-utils';
 async function createProject(request: APIRequestContext): Promise<{ id: string; name: string }> {
 	const ts = Date.now();
 	const res = await request.post('/api/projects', {
-		data: { name: `MCS Audit ${ts}`, path: `./data/projects/mcs-audit-${ts}` }
+		data: { name: `MCS Audit ${ts}` }
 	});
 	expect(res.ok(), `project creation failed: ${await res.text()}`).toBeTruthy();
 	return (await res.json()) as { id: string; name: string };
@@ -64,22 +64,35 @@ async function openProject(page: Page, projectId: string) {
 // ─── Suite 1: Project lifecycle ──────────────────────────────────────────────
 
 test.describe('Project lifecycle', () => {
-	test('home page loads and lists projects', async ({ page }, testInfo) => {
+	test('root shows the command-line start screen without a default project', async ({ page }) => {
 		await page.goto('/');
+		await expect(page.getByTestId('no-project-screen')).toBeVisible({ timeout: 8000 });
+		await expect(page.getByText('mcs create my-project')).toBeVisible();
+		await expect(page.getByRole('link', { name: /project manager/i })).toHaveAttribute(
+			'href',
+			'/projects'
+		);
+	});
+
+	test('project manager loads and lists projects', async ({ page }, testInfo) => {
+		await page.goto('/projects');
 		await expect(page.locator('h1, .brand, [class*="home"]').first()).toBeVisible({
 			timeout: 8000
 		});
-		// Project picker should be present
+		// The existing project manager remains available at its secondary route.
 		await expect(page.locator('.section, .project-list, form').first()).toBeVisible({
 			timeout: 5000
 		});
 		await takeScreenshot(page, testInfo, 'home-page.png', { fullPage: true });
 	});
 
-	test('create project from home form and navigate to it', async ({ page, request }, testInfo) => {
+	test('create project from the project manager and navigate to it', async ({
+		page,
+		request
+	}, testInfo) => {
 		const ts = Date.now();
 		const name = `E2E Create ${ts}`;
-		await page.goto('/');
+		await page.goto('/projects');
 		// Wait for full JS hydration before interacting with the create form
 		const createSection = page.locator('section').filter({ hasText: 'Create project' });
 		await expect(createSection).toBeVisible({ timeout: 8000 });
@@ -107,27 +120,6 @@ test.describe('Project lifecycle', () => {
 		const projects = (await listRes.json()) as { id: string; name: string }[];
 		const proj = projects.find((p) => p.name === name);
 		if (proj) await deleteProject(request, proj.id);
-	});
-
-	test('example system monitor project opens tailored tour', async ({ page, request }) => {
-		await page.goto('/');
-		const createSection = page.locator('section').filter({ hasText: 'Create project' });
-		await expect(createSection).toBeVisible({ timeout: 8000 });
-		await createSection.getByRole('button', { name: 'Example projects' }).click();
-		await expect(createSection.locator('#example-projects-panel')).toBeVisible();
-		await createSection.getByRole('button', { name: /System Monitor/i }).click();
-		await expect(page).toHaveURL(/\/project\/[^/]+/, { timeout: 20000 });
-		const dialog = page.getByRole('dialog');
-		await expect(dialog).toBeVisible({ timeout: 10000 });
-		await expect(dialog.getByRole('heading', { name: 'System Monitor example' })).toBeVisible();
-		await page.getByRole('button', { name: 'Close' }).click();
-		await expect(dialog).not.toBeVisible();
-		await expect(page.getByRole('heading', { name: 'System Monitor' }).last()).toBeVisible();
-		await expect(page.getByText('Built-in source: system-sensor')).toBeVisible();
-		await expect(page.getByText('Feed your data')).toBeVisible();
-		const id = new URL(page.url()).pathname.match(/\/project\/([^/]+)/)?.[1];
-		expect(id).toBeTruthy();
-		if (id) await deleteProject(request, id);
 	});
 
 	test('project API: create, read, patch, then delete', async ({ request }) => {
@@ -161,14 +153,6 @@ test.describe('Project lifecycle', () => {
 		};
 		expect(updatedProj.name).toBe('Renamed Project');
 		expect(updatedProj.settings?.dateTime?.timeFormat).toBe('12h');
-
-		const patchKind = await request.patch(`/api/projects/${proj.id}`, {
-			data: { settings: { tutorialExampleKind: 'ndvi' } }
-		});
-		expect(patchKind.ok()).toBeTruthy();
-		const afterKind = await request.get(`/api/projects/${proj.id}`);
-		const withKind = (await afterKind.json()) as { settings?: { tutorialExampleKind?: string } };
-		expect(withKind.settings?.tutorialExampleKind).toBe('ndvi');
 
 		// Delete (metadata only)
 		const deleteRes = await request.delete(`/api/projects/${proj.id}`);
@@ -208,15 +192,8 @@ test.describe('Object tree CRUD', () => {
 		expect(fetched.parentId).toBe(rootId);
 	});
 
-	test('create all chart types', async ({ request }) => {
-		const types = [
-			'line-plot',
-			'bar-chart',
-			'scatter-plot',
-			'overlay-plot',
-			'stacked-plot',
-			'function-plot'
-		];
+	test('create the line plot', async ({ request }) => {
+		const types = ['line-plot'];
 		for (const type of types) {
 			const res = await request.post(`/api/projects/${projectId}/objects`, {
 				data: { type, parentId: rootId, name: `${type} test` }
@@ -227,8 +204,8 @@ test.describe('Object tree CRUD', () => {
 		}
 	});
 
-	test('create widget types', async ({ request }) => {
-		const types = ['gauge', 'clock', 'timer', 'time-strip', 'telemetry-table', 'map-view'];
+	test('create display types', async ({ request }) => {
+		const types = ['gauge', 'telemetry-table', 'markdown-note', 'image', 'video-stream'];
 		for (const type of types) {
 			const res = await request.post(`/api/projects/${projectId}/objects`, {
 				data: { type, parentId: rootId, name: `${type} test` }
@@ -238,7 +215,7 @@ test.describe('Object tree CRUD', () => {
 	});
 
 	test('create layout types', async ({ request }) => {
-		for (const type of ['layout', 'stack', 'grid-layout']) {
+		for (const type of ['flex-layout', 'grid-layout']) {
 			const res = await request.post(`/api/projects/${projectId}/objects`, {
 				data: { type, parentId: rootId, name: `${type} test` }
 			});
@@ -446,67 +423,7 @@ test.describe('Annotations', () => {
 	});
 });
 
-// ─── Suite 6: Plugin API ─────────────────────────────────────────────────────
-
-test.describe('Plugin API', () => {
-	test('GET /api/plugins lists running plugins', async ({ request }) => {
-		const res = await request.get('/api/plugins');
-		expect(res.ok()).toBeTruthy();
-		const body = (await res.json()) as unknown[];
-		expect(Array.isArray(body)).toBeTruthy();
-	});
-
-	test('GET /api/plugins/available lists available plugins', async ({ request }) => {
-		const res = await request.get('/api/plugins/available');
-		expect(res.ok()).toBeTruthy();
-		const body = (await res.json()) as { plugins: { id: string }[] };
-		expect(Array.isArray(body.plugins)).toBeTruthy();
-	});
-
-	test('GET /api/plugins/catalog returns structured catalog', async ({ request }) => {
-		const res = await request.get('/api/plugins/catalog');
-		expect(res.ok()).toBeTruthy();
-		const body = (await res.json()) as { plugins: unknown[] };
-		expect(Array.isArray(body.plugins)).toBeTruthy();
-	});
-});
-
-// ─── Suite 7: Gallery pages ───────────────────────────────────────────────────
-
-test.describe('Gallery views', () => {
-	const galleryRoutes = [
-		'/gallery/line-plot/multi-stream',
-		'/gallery/bar-chart/time-buckets',
-		'/gallery/scatter-plot/multi-source',
-		'/gallery/overlay-plot/combined',
-		'/gallery/stacked-plot/panels',
-		'/gallery/function-plot/orbital',
-		'/gallery/gauge/dial',
-		'/gallery/gauge/linear',
-		'/gallery/clock/default',
-		'/gallery/timer/countdown',
-		'/gallery/telemetry-table/multi-stream'
-	];
-
-	for (const route of galleryRoutes) {
-		test(`gallery ${route} renders without errors`, async ({ page }, testInfo) => {
-			await page.goto(route);
-			// Should not show error page
-			await expect(page.locator('.error, [class*="error-page"]').first()).not.toBeVisible();
-			// Should render some content
-			await expect(page.getByRole('main')).toBeVisible({ timeout: 8000 });
-			// No JS errors (check console)
-			const errors: string[] = [];
-			page.on('pageerror', (e) => errors.push(e.message));
-			await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-			// Screenshot for visual audit
-			const safeName = route.replace(/\//g, '-').replace(/^-/, '');
-			await takeScreenshot(page, testInfo, `gallery${safeName}.png`);
-		});
-	}
-});
-
-// ─── Suite 8: Full UI workflow ────────────────────────────────────────────────
+// ─── Suite 7: Full UI workflow ────────────────────────────────────────────────
 
 test.describe('Full UI workflow', () => {
 	let projectId: string;
@@ -551,7 +468,10 @@ test.describe('Full UI workflow', () => {
 		await takeScreenshot(page, testInfo, 'command-palette.png');
 	});
 
-	test('create line plot in UI, select it, verify properties panel', async ({ page, request }, testInfo) => {
+	test('create line plot in UI, select it, verify properties panel', async ({
+		page,
+		request
+	}, testInfo) => {
 		const linePlotId = await createObject(request, projectId, rootId, 'line-plot', 'UI Line Plot', {
 			dataSources: [{ streamId: 'ui.sensor', field: 'value', label: 'Sensor' }],
 			showGrid: true
@@ -572,7 +492,10 @@ test.describe('Full UI workflow', () => {
 		await takeScreenshot(page, testInfo, 'line-plot-selected.png');
 	});
 
-	test('create gauge in UI, configure data source, see live value', async ({ page, request }, testInfo) => {
+	test('create gauge in UI, configure data source, see live value', async ({
+		page,
+		request
+	}, testInfo) => {
 		const gaugeId = await createObject(request, projectId, rootId, 'gauge', 'UI Gauge', {
 			min: 0,
 			max: 100,
@@ -651,6 +574,15 @@ test.describe('Service worker endpoint', () => {
 		const ct = res.headers()['content-type'];
 		expect(ct).toContain('javascript');
 	});
+
+	test('GET /api/health reports a live process without caching', async ({ request }) => {
+		const response = await request.get('/api/health');
+		expect(response.status()).toBe(200);
+		expect(response.headers()['cache-control']).toBe('no-store');
+		const body = await response.json();
+		expect(body.ok).toBe(true);
+		expect(body.uptimeSeconds).toBeGreaterThanOrEqual(0);
+	});
 });
 
 // ─── Suite 10: Object reorder API ────────────────────────────────────────────
@@ -691,10 +623,10 @@ test.describe('Object reorder', () => {
 		expect(aIdx).toBeLessThan(bIdx);
 	});
 
-	test('reorder with wrong childIds returns 400 or 500', async ({ request }) => {
+	test('reorder with wrong childIds returns 400', async ({ request }) => {
 		const res = await request.post(`/api/projects/${projectId}/object-reorder`, {
 			data: { parentId: rootId, childIds: ['nonexistent-uuid'] }
 		});
-		expect(res.status()).toBeGreaterThanOrEqual(400);
+		expect(res.status()).toBe(400);
 	});
 });

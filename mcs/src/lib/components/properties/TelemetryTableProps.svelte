@@ -5,7 +5,6 @@
 		MCSObject
 	} from '$lib/objects/types.js';
 	import { currentProject, invalidateSelectedObject } from '$lib/stores/project';
-	import { getSampleStreamOptions } from '$lib/charts/sample-streams.js';
 	import PropSection from './PropSection.svelte';
 	import PropRow from './PropRow.svelte';
 	import PropNumber from './PropNumber.svelte';
@@ -14,8 +13,6 @@
 
 	let { object } = $props<{ object: MCSObject }>();
 
-	const sampleStreams = getSampleStreamOptions();
-	let showSamples = $state(false);
 	let projectStreams = $state<{ id: string; name: string }[]>([]);
 	let localProps = $state<TelemetryTablePropsType>({ rowLimit: 500, columns: [] });
 	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -49,21 +46,10 @@
 	});
 
 	const streamOptions = $derived.by(() => {
-		const sampleIds = new Set(sampleStreams.map((stream) => stream.id));
-		const liveOptions = projectStreams
-			.filter((stream) => !sampleIds.has(stream.id))
-			.map((stream) => ({ value: stream.id, label: stream.name }));
-		if (showSamples) {
-			return [
-				{ value: '', label: '(none)' },
-				...liveOptions,
-				...sampleStreams.map((stream) => ({
-					value: stream.id,
-					label: `[Sample] ${stream.name}`
-				}))
-			];
-		}
-		return [{ value: '', label: '(none)' }, ...liveOptions];
+		return [
+			{ value: '', label: '(none)' },
+			...projectStreams.map((stream) => ({ value: stream.id, label: stream.name }))
+		];
 	});
 
 	function scheduleSave(nextProps: TelemetryTablePropsType) {
@@ -193,10 +179,6 @@
 
 		<div class="columns-actions">
 			<button type="button" class="column-add" onclick={addColumn}>Add column</button>
-			<label class="sample-toggle">
-				<input type="checkbox" bind:checked={showSamples} />
-				Show sample streams
-			</label>
 		</div>
 	</PropSection>
 </div>
@@ -265,16 +247,6 @@
 		justify-content: space-between;
 		gap: 0.75rem;
 		flex-wrap: wrap;
-	}
-	.sample-toggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45rem;
-		font-size: 0.78rem;
-		color: var(--mcs-text-muted);
-	}
-	.sample-toggle input {
-		accent-color: var(--mcs-accent);
 	}
 	@media (max-width: 900px) {
 		.column-main-grid,

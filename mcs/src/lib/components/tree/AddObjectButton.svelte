@@ -62,12 +62,10 @@
 </script>
 
 {#if $currentProject}
-	{#if !false}
-		<button type="button" class="add-btn" onclick={openModal} aria-label="Add object">
-			<Plus size={12} />
-			<span class="add-btn-text">Add</span>
-		</button>
-	{/if}
+	<button type="button" class="add-btn" onclick={openModal} aria-label="Add object">
+		<Plus size={12} />
+		<span class="add-btn-text">Add</span>
+	</button>
 {/if}
 
 {#if modalOpen && $currentProject}

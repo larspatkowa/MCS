@@ -1,9 +1,12 @@
 <script lang="ts">
 	import type { TelemetryTableColumn, TelemetryTableProps } from '$lib/objects/types.js';
-	import { getSampleStreamSeries, isSampleStreamId } from '$lib/charts/sample-streams.js';
 	import { subscribeSSE } from '$lib/sse-manager.js';
 	import { currentProject } from '$lib/stores/project.js';
+	import { timeConductorState } from '$lib/stores/timeline.js';
+	import { replayClock } from '$lib/stores/replay-session.js';
+	import { replayRunId, replaySamplesForStream } from '$lib/stores/run.js';
 	import { formatValue } from '$lib/charts/chart-utils.js';
+	import { latestAtOrBefore, mergeTimeOrderedSamples } from '$lib/charts/time-alignment.js';
 	import { ChevronDown, ChevronUp } from '@lucide/svelte';
 	import ErrorBoundary from '../ErrorBoundary.svelte';
 
@@ -12,18 +15,23 @@
 	const columns = $derived(props.columns ?? []);
 	const rowLimit = $derived(props.rowLimit ?? 500);
 	const POLL_MS = 2000;
-	const WINDOW_SEC = 120;
 
 	type Row = { ts: number; values: Record<string, number | string> };
 	let rows = $state<Row[]>([]);
+	let historyError = $state('');
+	let historyLoading = $state(false);
+	let historyRetry = $state(0);
+	const historyBuffer: Record<string, LivePt[]> = {};
 	let sortCol = $state<string | null>(null);
 	let sortAsc = $state(false);
 	let autoScroll = $state(true);
 	let tableBody = $state<HTMLElement | null>(null);
 
-	// Ring buffer for live SSE-driven columns (non-sample streams)
-	type LivePt = { ts: number; value: number };
+	// Ring buffer for live SSE-driven columns
+	type LivePt = { timestamp: number; value: number; eventId?: number };
 	const liveBuffer: Record<string, LivePt[]> = {};
+	const latestEventIdByColumn: Record<string, number> = {};
+	let liveRowsTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function isUsableNumber(input: unknown): input is number {
 		return (
@@ -56,130 +64,262 @@
 		const limit = Math.min(refBuf.length, rowLimit);
 		const slice = refBuf.slice(-limit);
 
-		rows = slice.map((pt, i) => {
+		rows = slice.map((point) => {
 			const values: Record<string, number | string> = {};
 			for (const col of columns) {
 				const key = colKey(col);
-				const buf = liveBuffer[key] ?? [];
-				const entry = buf[buf.length - limit + i];
+				const entry = latestAtOrBefore(liveBuffer[key] ?? [], point.timestamp);
 				values[key] = entry != null ? entry.value : '—';
 			}
-			return { ts: pt.ts, values };
+			return { ts: point.timestamp, values };
 		});
+	}
+
+	function scheduleLiveRows(): void {
+		if (liveRowsTimer !== null) return;
+		liveRowsTimer = setTimeout(() => {
+			liveRowsTimer = null;
+			buildLiveRows();
+		}, 100);
 	}
 
 	function fetchData() {
 		if (!columns.length) return;
-		// Sample-stream path: build rows directly from in-memory generators
-		const refCol = columns[0];
-		if (!refCol || !isSampleStreamId(refCol.streamId)) return;
-
-		const refSeries = getSampleStreamSeries(refCol.streamId, {
-			windowSec: WINDOW_SEC,
-			points: Math.min(rowLimit, 200)
-		});
-
-		const sampleSeries: Record<string, { timestamp: number; value: number }[]> = {};
-		for (const col of columns) {
-			if (isSampleStreamId(col.streamId)) {
-				sampleSeries[colKey(col)] = getSampleStreamSeries(col.streamId, {
-					windowSec: WINDOW_SEC,
-					points: Math.min(rowLimit, 200)
-				});
-			}
-		}
-
-		const newRows: Row[] = refSeries.map((pt, i) => {
-			const values: Record<string, number | string> = {};
+		if ($replayRunId) {
+			const seriesByColumn = new Map<
+				string,
+				{ timestamp: number; value: number; payload: Record<string, unknown> }[]
+			>();
 			for (const col of columns) {
-				const key = colKey(col);
-				const series = sampleSeries[key];
-				if (series && series[i]) {
-					values[key] = series[i].value;
-				} else {
-					values[key] = '—';
-				}
+				const points = replaySamplesForStream(col.streamId, { to: $replayClock.playhead }) ?? [];
+				seriesByColumn.set(
+					colKey(col),
+					points.map((point) => ({
+						timestamp: point.timestamp,
+						value:
+							typeof point[col.field ?? 'value'] === 'number'
+								? Number(point[col.field ?? 'value'])
+								: point.value,
+						payload: point
+					}))
+				);
 			}
-			return { ts: pt.timestamp, values };
-		});
-
-		rows = newRows;
+			const reference = seriesByColumn.get(colKey(columns[0])) ?? [];
+			rows = reference.slice(-rowLimit).map((point) => {
+				const values: Record<string, number | string> = {};
+				for (const col of columns) {
+					const series = seriesByColumn.get(colKey(col)) ?? [];
+					const match = latestAtOrBefore(series, point.timestamp);
+					values[colKey(col)] = match && Number.isFinite(match.value) ? match.value : '—';
+				}
+				return { ts: point.timestamp, values };
+			});
+			return;
+		}
+		if ($timeConductorState.mode === 'fixed') {
+			const playhead =
+				$replayClock.mode === 'live' ? $timeConductorState.fixedEnd : $replayClock.playhead;
+			const reference = historyBuffer[colKey(columns[0])] ?? [];
+			rows = reference
+				.filter((point) => point.timestamp <= playhead)
+				.slice(-rowLimit)
+				.map((point) => {
+					const values: Record<string, number | string> = {};
+					for (const col of columns) {
+						const series = historyBuffer[colKey(col)] ?? [];
+						const match = latestAtOrBefore(series, point.timestamp);
+						values[colKey(col)] = match?.value ?? '—';
+					}
+					return { ts: point.timestamp, values };
+				});
+			return;
+		}
+		buildLiveRows();
 	}
 
-	// SSE subscription for non-sample (plugin) columns, plus historical seed
+	async function loadHistory(
+		projectId: string,
+		cols: TelemetryTableColumn[],
+		from: number,
+		to: number,
+		signal: AbortSignal
+	) {
+		const dataByStream = new Map<string, { timestamp: number; [key: string]: unknown }[]>();
+		for (const streamId of [...new Set(cols.map((col) => col.streamId))]) {
+			const query = new URLSearchParams({
+				from: String(from),
+				to: String(to),
+				limit: String(Math.max(rowLimit * 4, 500)),
+				includeEventIds: '1'
+			});
+			const response = await fetch(
+				`/api/projects/${projectId}/streams/${encodeURIComponent(streamId)}/samples?${query}`,
+				{ signal }
+			);
+			if (!response.ok) throw new Error(`History query failed for ${streamId}`);
+			const body = await response.json();
+			dataByStream.set(streamId, Array.isArray(body.data) ? body.data : []);
+		}
+		if (signal.aborted) return;
+		for (const col of cols) {
+			const field = col.field ?? 'value';
+			historyBuffer[colKey(col)] = (dataByStream.get(col.streamId) ?? [])
+				.map((sample) => ({
+					timestamp: sample.timestamp,
+					value: Number(sample[field] ?? sample.value),
+					...(typeof sample.eventId === 'number' ? { eventId: sample.eventId } : {})
+				}))
+				.filter((sample) => Number.isFinite(sample.value));
+		}
+		historyError = '';
+		fetchData();
+	}
+
+	// SSE subscription for live columns, plus historical seed
 	$effect(() => {
+		if ($replayRunId || $timeConductorState.mode === 'fixed') return;
 		const proj = $currentProject;
 		const cols = columns;
 		if (!proj || !cols.length) return;
 
-		const pluginCols = cols.filter((c: any) => !isSampleStreamId(c.streamId));
-		if (!pluginCols.length) return;
+		const liveCols = cols;
+		if (!liveCols.length) return;
 
 		// ── Seed liveBuffer from historical REST samples ──────────────────────
 		const seenForSeed = new Set<string>();
-		for (const col of pluginCols) {
+		for (const col of liveCols) {
 			const key = colKey(col);
 			const field = col.field ?? 'value';
 			if (seenForSeed.has(key)) continue;
 			seenForSeed.add(key);
 			const load = fetch(
-						`/api/projects/${proj.id}/streams/${encodeURIComponent(col.streamId)}/samples?limit=${rowLimit}`
-					).then((r) => (r.ok ? r.json() : { data: [] }));
-			load.then((body: { data?: { timestamp: number; value?: number; [k: string]: unknown }[] }) => {
-					const pts: LivePt[] = (body.data ?? [])
-						.map((s) => ({
-							ts: s.timestamp,
-							value:
-								typeof s[field] === 'number'
-									? (s[field] as number)
-									: typeof s.value === 'number'
-										? s.value
-										: NaN
-						}))
-						.filter((p) => isUsableNumber(p.value));
-					if (pts.length) {
-						liveBuffer[key] = pts.slice(-rowLimit);
-						buildLiveRows();
+				`/api/projects/${encodeURIComponent(proj.id)}/streams/${encodeURIComponent(col.streamId)}/samples?limit=${rowLimit}&includeEventIds=1`
+			).then((r) => (r.ok ? r.json() : { data: [] }));
+			load
+				.then(
+					(body: {
+						data?: { timestamp: number; value?: number; eventId?: number; [k: string]: unknown }[];
+					}) => {
+						const pts: LivePt[] = (body.data ?? [])
+							.map((s) => ({
+								timestamp: s.timestamp,
+								value:
+									typeof s[field] === 'number'
+										? (s[field] as number)
+										: typeof s.value === 'number'
+											? s.value
+											: NaN,
+								...(s.eventId === undefined ? {} : { eventId: s.eventId })
+							}))
+							.filter((p) => isUsableNumber(p.value));
+						if (pts.length) {
+							liveBuffer[key] = mergeTimeOrderedSamples(liveBuffer[key] ?? [], pts, rowLimit);
+							for (const point of pts) {
+								if (point.eventId !== undefined) {
+									latestEventIdByColumn[key] = Math.max(
+										latestEventIdByColumn[key] ?? 0,
+										point.eventId
+									);
+								}
+							}
+							scheduleLiveRows();
+						}
 					}
-				}).catch(() => {});
+				)
+				.catch(() => {});
 		}
 
 		// ── Live SSE subscription ────────────────────────────────────────────
 		const unsubs: (() => void)[] = [];
 		const seenStreams = new Set<string>();
 
-		for (const col of pluginCols) {
+		for (const col of liveCols) {
 			if (seenStreams.has(col.streamId)) continue;
 			seenStreams.add(col.streamId);
 
 			const unsub = subscribeSSE(proj.id, col.streamId, (event) => {
 				if (!('values' in event)) return;
-				const ev = event.values as Record<string, unknown>;
+				const samples = event.samples ?? [
+					{
+						timestamp: event.timestamp,
+						values: event.values,
+						eventId: event.eventId
+					}
+				];
 
 				// Populate all columns tied to this stream
 				for (const c of cols) {
 					if (c.streamId !== event.streamId) continue;
 					const field = c.field ?? 'value';
 					const key = colKey(c);
-					const rawVal = ev[field] ?? ev['value'];
-					if (rawVal === undefined) continue;
-					const val = Number(rawVal);
-					if (!isUsableNumber(val)) continue;
-					const buf = liveBuffer[key] ?? [];
-					buf.push({ ts: event.timestamp, value: val });
-					if (buf.length > rowLimit) buf.splice(0, buf.length - rowLimit);
-					liveBuffer[key] = buf;
+					const incoming: LivePt[] = [];
+					for (const sample of samples) {
+						const rawVal = sample.values[field] ?? sample.values.value;
+						if (rawVal === undefined) continue;
+						const val = Number(rawVal);
+						if (!isUsableNumber(val)) continue;
+						incoming.push({
+							timestamp: sample.timestamp,
+							value: val,
+							...(sample.eventId === undefined ? {} : { eventId: sample.eventId })
+						});
+					}
+					liveBuffer[key] = mergeTimeOrderedSamples(liveBuffer[key] ?? [], incoming, rowLimit);
+					for (const point of incoming) {
+						if (point.eventId !== undefined) {
+							latestEventIdByColumn[key] = Math.max(latestEventIdByColumn[key] ?? 0, point.eventId);
+						}
+					}
 				}
-				buildLiveRows();
+				scheduleLiveRows();
 			});
 			unsubs.push(unsub);
 		}
 		return () => {
 			for (const u of unsubs) u();
+			if (liveRowsTimer !== null) clearTimeout(liveRowsTimer);
+			liveRowsTimer = null;
 		};
 	});
 
 	$effect(() => {
+		const project = $currentProject;
+		const state = $timeConductorState;
+		const cols = columns;
+		historyRetry;
+		if (!project || state.mode !== 'fixed' || $replayRunId || cols.length === 0) return;
+		const controller = new AbortController();
+		historyError = '';
+		historyLoading = true;
+		rows = [];
+		const timer = setTimeout(() => {
+			void loadHistory(project.id, cols, state.fixedStart, state.fixedEnd, controller.signal)
+				.catch((cause) => {
+					if (!controller.signal.aborted)
+						historyError = cause instanceof Error ? cause.message : 'History query failed';
+				})
+				.finally(() => {
+					if (!controller.signal.aborted) historyLoading = false;
+				});
+		}, 100);
+		return () => {
+			clearTimeout(timer);
+			controller.abort();
+			historyLoading = false;
+		};
+	});
+
+	$effect(() => {
+		if ($replayRunId) {
+			$replayClock.playhead;
+			fetchData();
+			return;
+		}
+		if ($timeConductorState.mode === 'fixed') {
+			$replayClock.playhead;
+			fetchData();
+			return;
+		}
 		fetchData();
 		const id = setInterval(fetchData, POLL_MS);
 		return () => clearInterval(id);
@@ -215,7 +355,7 @@
 	}
 
 	function formatTs(ts: number): string {
-		const d = new Date(ts);
+		const d = new Date(ts * 1000);
 		return d.toISOString().slice(11, 23);
 	}
 </script>
@@ -229,6 +369,16 @@
 		</label>
 	</div>
 	<div class="tt-body" bind:this={tableBody}>
+		{#if $timeConductorState.mode === 'fixed' && !$replayRunId && historyError}
+			<div class="history-message" role="status">
+				<span>{historyError}</span>
+				<button type="button" onclick={() => (historyRetry += 1)}>Retry</button>
+			</div>
+		{:else if $timeConductorState.mode === 'fixed' && !$replayRunId && historyLoading}
+			<div class="history-message" role="status">Loading history…</div>
+		{:else if $timeConductorState.mode === 'fixed' && !$replayRunId && rows.length === 0 && columns.length > 0}
+			<div class="history-message" role="status">No samples in this time window.</div>
+		{/if}
 		<table class="data-table">
 			<thead>
 				<tr>
@@ -250,7 +400,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each sortedRows as row (row.ts)}
+				{#each sortedRows as row, rowIndex (row.ts + ':' + rowIndex)}
 					<tr>
 						<td class="ts-col">{formatTs(row.ts)}</td>
 						{#each columns as col}
@@ -284,6 +434,29 @@
 		overflow: hidden;
 		font-family: var(--mcs-font-sans);
 	}
+	.history-message {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.6rem;
+		min-height: 2.5rem;
+		padding: 0.5rem;
+		color: var(--mcs-text-muted);
+		font-size: 0.75rem;
+	}
+	.history-message button {
+		border: 1px solid var(--mcs-border);
+		border-radius: var(--mcs-radius);
+		padding: 0.25rem 0.5rem;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+	}
+	.history-message button:focus-visible {
+		outline: 2px solid var(--mcs-accent);
+		outline-offset: 2px;
+	}
 
 	.tt-header {
 		display: flex;
@@ -311,7 +484,7 @@
 	}
 
 	.tt-auto input {
-		accent-color: var(--mcs-accent, #4f9cf9);
+		accent-color: var(--mcs-accent, #1a1a1a);
 	}
 
 	.tt-body {
@@ -362,12 +535,12 @@
 		text-align: right;
 	}
 	td.severity-warning {
-		color: #fbbf24;
-		background: color-mix(in srgb, #f59e0b 16%, transparent);
+		color: var(--mcs-text);
+		background: color-mix(in srgb, var(--mcs-warning, #777777) 16%, transparent);
 	}
 	td.severity-alarm {
-		color: #fca5a5;
-		background: color-mix(in srgb, #ef4444 16%, transparent);
+		color: var(--mcs-text);
+		background: color-mix(in srgb, var(--mcs-danger, #222222) 16%, transparent);
 	}
 
 	.ts-col {
@@ -377,7 +550,7 @@
 	}
 
 	tr:hover td {
-		background: color-mix(in srgb, var(--mcs-accent, #4f9cf9) 6%, transparent);
+		background: color-mix(in srgb, var(--mcs-accent, #1a1a1a) 6%, transparent);
 	}
 
 	tbody tr:last-child td {

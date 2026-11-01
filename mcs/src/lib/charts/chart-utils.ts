@@ -3,18 +3,16 @@
  * No external dependencies — pure math and string generation.
  */
 
-/** Consistent series palette across all chart types. */
+/** Consistent series palette across all chart types, defined per theme in theme.css. */
 export const SERIES_COLORS = [
-	'#4f9cf9',
-	'#f97316',
-	'#10b981',
-	'#f59e0b',
-	'#8b5cf6',
-	'#ec4899',
-	'#14b8a6',
-	'#ef4444',
-	'#a78bfa',
-	'#fb923c'
+	'var(--mcs-series-1)',
+	'var(--mcs-series-2)',
+	'var(--mcs-series-3)',
+	'var(--mcs-series-4)',
+	'var(--mcs-series-5)',
+	'var(--mcs-series-6)',
+	'var(--mcs-series-7)',
+	'var(--mcs-series-8)'
 ] as const;
 
 /** Map a value from domain to range linearly. Returns a function. */
@@ -43,15 +41,49 @@ export function niceTicks(min: number, max: number, targetCount = 5): number[] {
 	return ticks;
 }
 
-/** Format a unix-seconds timestamp for axis labels. Adjusts detail based on time span. */
+/**
+ * Format a unix-seconds timestamp for axis labels in UTC, the same clock as
+ * tables and the bottom bar. Adjusts detail based on time span.
+ */
 export function formatTimestamp(t: number, spanSec: number): string {
 	const d = new Date(t * 1000);
-	if (spanSec <= 300) return d.toISOString().slice(14, 19); // MM:SS
-	if (spanSec < 86400) return d.toISOString().slice(11, 19); // HH:MM:SS
+	const hours = d.getUTCHours().toString().padStart(2, '0');
+	const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+	const seconds = d.getUTCSeconds().toString().padStart(2, '0');
+	if (spanSec <= 300) return `${hours}:${minutes}:${seconds}`; // HH:MM:SS
+	if (spanSec < 86400) return `${hours}:${minutes}`; // HH:MM
 	return `${(d.getUTCMonth() + 1).toString().padStart(2, '0')}/${d
 		.getUTCDate()
 		.toString()
-		.padStart(2, '0')} ${d.toISOString().slice(11, 16)}`;
+		.padStart(2, '0')} ${hours}:${minutes}`;
+}
+
+/**
+ * Split a time-ordered series into contiguous runs so a line is not drawn
+ * through periods with no data. A gap is any step longer than `factor` times
+ * the series' median sample interval (and longer than `minGap` seconds).
+ */
+export function splitAtGaps<T extends { timestamp: number }>(
+	points: T[],
+	factor = 5,
+	minGap = 0
+): T[][] {
+	if (points.length < 3) return points.length ? [points] : [];
+	const steps: number[] = [];
+	for (let i = 1; i < points.length; i++) {
+		const dt = points[i].timestamp - points[i - 1].timestamp;
+		if (dt > 0) steps.push(dt);
+	}
+	if (steps.length === 0) return [points];
+	steps.sort((a, b) => a - b);
+	const median = steps[Math.floor(steps.length / 2)];
+	const threshold = Math.max(median * factor, minGap);
+	const runs: T[][] = [[points[0]]];
+	for (let i = 1; i < points.length; i++) {
+		if (points[i].timestamp - points[i - 1].timestamp > threshold) runs.push([]);
+		runs[runs.length - 1].push(points[i]);
+	}
+	return runs;
 }
 
 /** Format a numeric value with fixed precision, returning '—' for non-finite. */

@@ -10,69 +10,19 @@
 	import { getView, resolveView, hasView } from '$lib/object-types/views.js';
 	import UnknownView from './UnknownView.svelte';
 	import FolderView from './FolderView.svelte';
-	import { goto } from '$app/navigation';
-	import { browser } from '$app/environment';
 	import type { Component } from 'svelte';
-	import { startProjectTourFromCurrentProject } from '$lib/stores/tutorial';
-	import type { TutorialExampleKind } from '$lib/tutorial-kinds.js';
-
-	interface WelcomeBrief {
-		summary: string;
-		pluginId?: string;
-		streamIds: string[];
-		displays: string[];
-		primaryObjectName?: string;
-	}
-
-	const WELCOME_BRIEFS: Record<TutorialExampleKind | 'generic', WelcomeBrief> = {
-		generic: {
-			summary:
-				'Post samples to /api/ingest, then drag a display from the Explorer onto the canvas.',
-			streamIds: ['my-hardware:temperature', 'ops:status', 'vehicle:gps'],
-			displays: ['line-plot', 'gauge', 'map-view', 'telemetry-table']
-		},
-		rocket: {
-			summary:
-				'Synthetic rocket telemetry — altitude, velocity, Max-Q, GPS, and a flight timeline.',
-			pluginId: 'rocket-mission',
-			streamIds: ['rocket:altitude', 'rocket:velocity', 'rocket:maxq', 'rocket:gps'],
-			displays: ['line-plot', 'gauge', 'map-view', 'telemetry-table', 'gantt-chart'],
-			primaryObjectName: 'Mission layout'
-		},
-		ndvi: {
-			summary:
-				'Agriculture Example Project',
-			pluginId: 'agri-ndvi-mission',
-			streamIds: ['agri:field_ndvi', 'agri:target_ndvi', 'agri:soil_moisture', 'agri:gps'],
-			displays: ['map-view', 'overlay-plot', 'gauge', 'telemetry-table', 'gantt-chart'],
-			primaryObjectName: 'Field layout'
-		},
-		system: {
-			summary:
-				'Samples the host machine into sys:* streams with plots, gauges, a table, and a location map.',
-			pluginId: 'system-sensor',
-			streamIds: ['sys:cpu_usage', 'sys:mem_used_pct', 'sys:disk_used_pct', 'sys:location'],
-			displays: ['line-plot', 'gauge', 'telemetry-table', 'map-view'],
-			primaryObjectName: 'System layout'
-		}
-	};
-
-	function getWelcomeBrief(kind: TutorialExampleKind | null | undefined): WelcomeBrief {
-		return kind ? WELCOME_BRIEFS[kind] : WELCOME_BRIEFS.generic;
-	}
+	import { setFixedBounds } from '$lib/stores/timeline.js';
+	import { startRunReplay } from '$lib/stores/run.js';
 
 	let resolvedView: Component<any> | null = $state(null);
 	let resolvingType: string = $state('');
-	let ingestOrigin = $state('');
 	let exportBusy = $state(false);
+	let runImportBusy = $state(false);
+	let runImportFileInput = $state<HTMLInputElement | null>(null);
+	let mediaImportBusy = $state(false);
+	let mediaImportFileInput = $state<HTMLInputElement | null>(null);
 	let welcomeHint = $state('');
 	let welcomeHintTimer: ReturnType<typeof setTimeout> | null = null;
-
-	$effect(() => {
-		if (browser) {
-			ingestOrigin = window.location.origin;
-		}
-	});
 
 	function showWelcomeHint(msg: string) {
 		if (welcomeHintTimer) clearTimeout(welcomeHintTimer);
@@ -81,15 +31,6 @@
 			welcomeHint = '';
 			welcomeHintTimer = null;
 		}, 2200);
-	}
-
-	async function copyText(text: string, okMsg: string) {
-		try {
-			await navigator.clipboard.writeText(text);
-			showWelcomeHint(okMsg);
-		} catch {
-			showWelcomeHint('Could not copy');
-		}
 	}
 
 	function slugify(input: string): string {
@@ -104,7 +45,6 @@
 	async function exportProjectAsJson() {
 		const proj = $currentProject;
 		if (!proj || exportBusy) return;
-		if (false) return;
 		exportBusy = true;
 		try {
 			const res = await fetch(`/api/projects/${proj.id}/objects`);
@@ -138,49 +78,62 @@
 		}
 	}
 
-	async function openPrimaryLayout(primaryObjectName: string | undefined) {
-		const proj = $currentProject;
-		if (!proj || !primaryObjectName) return;
+	async function importRunFile(event: Event): Promise<void> {
+		const project = $currentProject;
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!project || !file || runImportBusy) return;
+		runImportBusy = true;
 		try {
-			const tree = await fetch(`/api/projects/${proj.id}/objects`).then((r) => (r.ok ? r.json() : null));
-			if (!tree) return;
-			const match = findObjectByName(tree, primaryObjectName);
-			if (match) {
-				await goto(`?object=${match.id}`);
+			const form = new FormData();
+			form.set('file', file);
+			const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/runs/import`, {
+				method: 'POST',
+				body: form
+			});
+			const result = await response.json().catch(() => null);
+			if (!response.ok) throw new Error(result?.error ?? `HTTP ${response.status}`);
+			if (typeof result?.firstTimestamp === 'number' && typeof result?.lastTimestamp === 'number') {
+				setFixedBounds(
+					result.firstTimestamp,
+					Math.max(result.firstTimestamp + 0.001, result.lastTimestamp)
+				);
 			}
-		} catch {
-			// no-op; button stays available
-		}
-	}
-
-	function findObjectByName(
-		node: { id: string; name?: string; children?: unknown[] } | null | undefined,
-		name: string
-	): { id: string } | null {
-		if (!node) return null;
-		if (node.name === name) return { id: node.id };
-		const children = Array.isArray(node.children) ? node.children : [];
-		for (const child of children) {
-			const found = findObjectByName(
-				child as { id: string; name?: string; children?: unknown[] },
-				name
+			if (result?.run?.id) await startRunReplay(project.id, result.run.id);
+			showWelcomeHint(
+				`Imported ${result.samples ?? 0} samples from ${file.name} and opened replay`
 			);
-			if (found) return found;
+		} catch (error) {
+			showWelcomeHint(error instanceof Error ? error.message : 'Run import failed');
+		} finally {
+			runImportBusy = false;
+			input.value = '';
 		}
-		return null;
 	}
 
-	let curlSnippet = $derived.by(() => {
-		const proj = $currentProject;
-		if (!proj || !ingestOrigin) return '';
-		return `curl -X POST ${ingestOrigin}/api/ingest \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "projectId": "${proj.id}",
-    "streamId": "my-hardware:temperature",
-    "values": { "value": 22.5 }
-  }'`;
-	});
+	async function importMediaFile(event: Event): Promise<void> {
+		const project = $currentProject;
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!project || !file || mediaImportBusy) return;
+		mediaImportBusy = true;
+		try {
+			const form = new FormData();
+			form.set('file', file);
+			const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/media`, {
+				method: 'POST',
+				body: form
+			});
+			const result = await response.json().catch(() => null);
+			if (!response.ok) throw new Error(result?.error ?? `HTTP ${response.status}`);
+			showWelcomeHint(`Imported media ${result?.asset?.sourceName ?? file.name}`);
+		} catch (error) {
+			showWelcomeHint(error instanceof Error ? error.message : 'Media import failed');
+		} finally {
+			mediaImportBusy = false;
+			input.value = '';
+		}
+	}
 
 	// Resolve view component (lazy or cached) whenever the selected object type changes
 	$effect(() => {
@@ -236,99 +189,50 @@
 {:else if !$selectedObject}
 	<div class="empty">Select an object from the tree.</div>
 {:else if $selectedObject.type === 'project'}
-	{@const brief = getWelcomeBrief($currentProject?.settings?.tutorialExampleKind)}
 	<div class="project-welcome">
 		<div class="welcome-card">
 			<h2 class="welcome-title">{$selectedObject.name}</h2>
-			<p class="welcome-summary">{brief.summary}</p>
-
 			<div class="welcome-actions">
-				{#if brief.primaryObjectName}
-					<button
-						type="button"
-						class="btn-primary"
-						onclick={() => openPrimaryLayout(brief.primaryObjectName)}
-					>
-						Open {brief.primaryObjectName}
-					</button>
-				{/if}
+				<button
+					type="button"
+					class="btn-primary"
+					disabled={exportBusy}
+					onclick={exportProjectAsJson}
+				>
+					{exportBusy ? 'Exporting…' : 'Export layout'}
+				</button>
 				<button
 					type="button"
 					class="btn-secondary"
-					onclick={() => startProjectTourFromCurrentProject()}
+					disabled={runImportBusy}
+					onclick={() => runImportFileInput?.click()}
 				>
-					Take a project tour
+					{runImportBusy ? 'Importing…' : 'Import run'}
 				</button>
-				{#if !false}
-					<button
-						type="button"
-						class="btn-secondary"
-						disabled={exportBusy}
-						onclick={exportProjectAsJson}
-					>
-						{exportBusy ? 'Exporting…' : 'Export layout as JSON'}
-					</button>
-				{/if}
+				<input
+					bind:this={runImportFileInput}
+					class="visually-hidden"
+					type="file"
+					accept=".csv,.json,.ndjson,.jsonl,text/csv,application/json,application/x-ndjson"
+					onchange={importRunFile}
+				/>
 				<button
 					type="button"
-					class="btn-ghost"
-					onclick={() => copyText($currentProject!.id, 'Project ID copied')}
+					class="btn-secondary"
+					disabled={mediaImportBusy}
+					onclick={() => mediaImportFileInput?.click()}
 				>
-					Copy project ID
+					{mediaImportBusy ? 'Importing…' : 'Import media'}
 				</button>
+				<input
+					bind:this={mediaImportFileInput}
+					class="visually-hidden"
+					type="file"
+					accept="video/*,audio/*,image/*"
+					onchange={importMediaFile}
+				/>
 			</div>
-
-			<div class="welcome-meta">
-				{#if brief.pluginId}
-					<div class="meta-row">
-						<span class="meta-label">Source</span>
-						<div class="token-list">
-							<code class="token-chip">Built-in source: {brief.pluginId}</code>
-						</div>
-					</div>
-				{/if}
-				<div class="meta-row">
-					<span class="meta-label">Streams</span>
-					<div class="token-list">
-						{#each brief.streamIds as streamId}
-							<code class="token-chip">{streamId}</code>
-						{/each}
-					</div>
-				</div>
-				<div class="meta-row">
-					<span class="meta-label">Displays</span>
-					<div class="token-list">
-						{#each brief.displays as display}
-							<span class="token-chip token-chip-plain">{display}</span>
-						{/each}
-					</div>
-				</div>
-			</div>
-
-			{#if !false}
-				<details class="welcome-ingest">
-					<summary>Feed your data</summary>
-					<p class="welcome-ingest-note">
-						Post to <code>/api/ingest</code> with this project's ID. Reuse the built-in stream names above
-						and the existing displays will pick them up automatically.
-					</p>
-					<div class="snippet-block">
-						<div class="snippet-head">
-							<span>curl</span>
-							<button
-								type="button"
-								class="copy-btn"
-								onclick={() => copyText(curlSnippet, 'Snippet copied')}>Copy</button
-							>
-						</div>
-						<pre class="snippet-pre">{curlSnippet || '…'}</pre>
-					</div>
-				</details>
-			{/if}
-
-			{#if welcomeHint}
-				<p class="welcome-hint" role="status">{welcomeHint}</p>
-			{/if}
+			{#if welcomeHint}<p class="welcome-hint" role="status">{welcomeHint}</p>{/if}
 		</div>
 	</div>
 {:else}
@@ -349,6 +253,17 @@
 {/if}
 
 <style>
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
 	.empty {
 		display: flex;
 		flex-direction: column;
@@ -425,12 +340,6 @@
 		margin: 0;
 		letter-spacing: -0.005em;
 	}
-	.welcome-summary {
-		margin: 0;
-		font-size: 0.9rem;
-		line-height: 1.55;
-		color: var(--mcs-text-muted);
-	}
 	.welcome-actions {
 		display: flex;
 		flex-wrap: wrap;
@@ -438,8 +347,7 @@
 		align-items: center;
 	}
 	.welcome-actions .btn-primary,
-	.welcome-actions .btn-secondary,
-	.welcome-actions .btn-ghost {
+	.welcome-actions .btn-secondary {
 		padding: 0.45rem 0.9rem;
 		font-size: 0.82rem;
 		font-family: var(--mcs-font-sans);
@@ -457,14 +365,8 @@
 		border: 1px solid var(--mcs-border);
 		color: var(--mcs-text);
 	}
-	.welcome-actions .btn-secondary:hover,
-	.welcome-actions .btn-ghost:hover {
+	.welcome-actions .btn-secondary:hover {
 		background: var(--mcs-border);
-	}
-	.welcome-actions .btn-ghost {
-		background: transparent;
-		border: 1px solid transparent;
-		color: var(--mcs-text-muted);
 	}
 	.welcome-actions button:disabled {
 		opacity: 0.55;
@@ -473,120 +375,6 @@
 	.welcome-actions button:focus-visible {
 		outline: 2px solid var(--mcs-accent);
 		outline-offset: 1px;
-	}
-	.welcome-meta {
-		display: flex;
-		flex-direction: column;
-		gap: 0.65rem;
-		padding-top: 0.35rem;
-		border-top: 1px solid var(--mcs-border);
-	}
-	.meta-row {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.55rem 0.75rem;
-		padding-top: 0.65rem;
-	}
-	.meta-label {
-		flex-shrink: 0;
-		min-width: 4.5rem;
-		font-size: 0.72rem;
-		font-family: var(--mcs-font-mono, monospace);
-		letter-spacing: 0.05em;
-		color: var(--mcs-text-muted);
-	}
-	.token-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem;
-	}
-	.token-chip {
-		display: inline-flex;
-		padding: 0.15rem 0.45rem;
-		border: 1px solid var(--mcs-border);
-		background: var(--mcs-surface-alt);
-		font-family: var(--mcs-font-mono, monospace);
-		font-size: 0.72rem;
-		color: var(--mcs-text);
-	}
-	.token-chip-plain {
-		font-family: var(--mcs-font-sans);
-		color: var(--mcs-text-muted);
-	}
-	.welcome-ingest {
-		border-top: 1px solid var(--mcs-border);
-		padding-top: 0.75rem;
-	}
-	.welcome-ingest > summary {
-		cursor: pointer;
-		list-style: none;
-		font-size: 0.82rem;
-		color: var(--mcs-text-muted);
-	}
-	.welcome-ingest > summary::marker,
-	.welcome-ingest > summary::-webkit-details-marker {
-		display: none;
-	}
-	.welcome-ingest > summary::before {
-		content: '+ ';
-		font-family: var(--mcs-font-mono, monospace);
-		color: var(--mcs-text-muted);
-	}
-	.welcome-ingest[open] > summary::before {
-		content: '− ';
-	}
-	.welcome-ingest-note {
-		margin: 0.6rem 0 0.5rem;
-		font-size: 0.8rem;
-		line-height: 1.5;
-		color: var(--mcs-text-muted);
-	}
-	.welcome-ingest-note code {
-		font-family: var(--mcs-font-mono, monospace);
-		font-size: 0.75rem;
-		padding: 0 0.25rem;
-		background: var(--mcs-surface-alt);
-		border: 1px solid var(--mcs-border);
-	}
-	.snippet-block {
-		border: 1px solid var(--mcs-border);
-		overflow: hidden;
-		background: var(--mcs-bg);
-	}
-	.snippet-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.35rem 0.5rem;
-		font-size: 0.72rem;
-		font-weight: 600;
-		color: var(--mcs-text-muted);
-		background: var(--mcs-surface-alt);
-		border-bottom: 1px solid var(--mcs-border);
-	}
-	.copy-btn {
-		padding: 0.22rem 0.5rem;
-		font-size: 0.72rem;
-		font-family: var(--mcs-font-sans);
-		background: var(--mcs-surface);
-		border: 1px solid var(--mcs-border);
-		color: var(--mcs-text);
-		cursor: pointer;
-	}
-	.copy-btn:hover {
-		background: var(--mcs-border);
-	}
-	.snippet-pre {
-		margin: 0;
-		padding: 0.6rem 0.65rem;
-		font-size: 0.72rem;
-		line-height: 1.5;
-		overflow: auto;
-		max-height: 11rem;
-		font-family: var(--mcs-font-mono, monospace);
-		color: var(--mcs-text);
-		white-space: pre;
 	}
 	.welcome-hint {
 		font-size: 0.75rem;
@@ -599,11 +387,6 @@
 		}
 		.welcome-card {
 			padding: 1.1rem;
-		}
-		.meta-row {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.35rem;
 		}
 	}
 </style>

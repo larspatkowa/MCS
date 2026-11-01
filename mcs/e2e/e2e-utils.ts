@@ -23,4 +23,3 @@ export async function takeScreenshot(
 		fullPage: options.fullPage
 	});
 }
-

@@ -8,7 +8,6 @@
 	import BottomBar from './BottomBar.svelte';
 	import SettingsModal from './SettingsModal.svelte';
 	import CommandPalette from './CommandPalette.svelte';
-	import TutorialOverlay from '../tutorial/TutorialOverlay.svelte';
 	import {
 		sidebarLeftVisible,
 		sidebarRightVisible,
@@ -21,19 +20,11 @@
 		LEFT_WIDTH_DEFAULT,
 		RIGHT_WIDTH_DEFAULT
 	} from '$lib/stores/sidebars';
-	import { currentProject, selectedObjectId, invalidateSelectedObject } from '$lib/stores/project';
-	import { refreshExplorerTree } from '$lib/stores/explorerTree';
+	import { currentProject, selectedObjectId } from '$lib/stores/project';
 	import { commandPaletteOpen } from '$lib/stores/commandPalette';
 	import { settingsModalOpen, addObjectModalOpen } from '$lib/stores/settings';
-	import { startProjectSync } from '$lib/project-sync.js';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import {
-		connectNotificationSSE,
-		disconnectNotificationSSE,
-		loadRecentLimitEvents
-	} from '$lib/stores/notifications';
-	import { tutorial } from '$lib/stores/tutorial';
 
 	function startResizeLeft(e: MouseEvent) {
 		e.preventDefault();
@@ -82,35 +73,8 @@
 		}
 	});
 
-	// Reactive sync: when another client changes project data, refetch selected object and tree
-	$effect(() => {
-		if (false) return;
-		const proj = $currentProject;
-		if (!proj) return;
-		const stop = startProjectSync(proj.id, {
-			getSelectedObjectId: () => get(selectedObjectId),
-			onObjectUpdated: () => invalidateSelectedObject(),
-			onTreeChanged: () => refreshExplorerTree()
-		});
-		return stop;
-	});
-
-	// Connect notification SSE + load recent events when project changes
-	$effect(() => {
-		if (false) return;
-		const proj = $currentProject;
-		if (!proj) {
-			disconnectNotificationSSE();
-			return;
-		}
-		connectNotificationSSE(proj.id);
-		loadRecentLimitEvents(proj.id);
-		return () => disconnectNotificationSSE();
-	});
-
 	function handleGlobalKeydown(e: KeyboardEvent) {
 		if (e.key !== 'Escape') return;
-		if (get(tutorial).active) return;
 		if (get(commandPaletteOpen)) return; // command palette handles its own Escape
 		if (get(settingsModalOpen)) {
 			settingsModalOpen.set(false);
@@ -142,11 +106,7 @@
 
 <SettingsModal />
 <CommandPalette />
-<div
-	class="shell"
-	data-layout-fullscreen-root
-	class:display-mode={isDisplayMode}
->
+<div class="shell" data-layout-fullscreen-root class:display-mode={isDisplayMode}>
 	{#if !isDisplayMode}
 		<header class="header">
 			<HeaderBar />
@@ -198,7 +158,6 @@
 			<BottomBar />
 		</footer>
 	{/if}
-	<TutorialOverlay />
 </div>
 
 <style>
@@ -279,11 +238,20 @@
 	}
 	.bottom-bar {
 		grid-area: bottom;
+		position: relative;
+		z-index: 20;
 		border-top: 1px solid var(--mcs-border);
 		min-height: 2rem;
 	}
 	:global([data-layout-fullscreen-root]:fullscreen) {
 		width: 100%;
 		height: 100%;
+	}
+	@media (max-width: 700px) {
+		.sidebar-left,
+		.sidebar-right,
+		.resizer {
+			display: none;
+		}
 	}
 </style>

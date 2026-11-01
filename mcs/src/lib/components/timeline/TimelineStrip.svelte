@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { currentProject } from '$lib/stores/project';
 	import { timeConductorState, getTimeBounds } from '$lib/stores/timeline';
+	import { replayClock, seekReplay } from '$lib/stores/replay-session.js';
 
 	let {
 		variant = 'compact',
@@ -86,6 +87,43 @@
 		return pct >= 0 && pct <= 100 ? pct : null;
 	});
 
+	const playheadPct = $derived.by(() => {
+		if ($replayClock.mode === 'live') return null;
+		const span = Math.max(0.001, $replayClock.end - $replayClock.start);
+		return Math.max(0, Math.min(100, (($replayClock.playhead - $replayClock.start) / span) * 100));
+	});
+
+	function seekFromPointer(event: PointerEvent) {
+		if ($replayClock.mode === 'live') return;
+		const track = event.currentTarget as HTMLElement;
+		const bounds = track.getBoundingClientRect();
+		if (bounds.width <= 0) return;
+		const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+		seekReplay($replayClock.start + ratio * ($replayClock.end - $replayClock.start));
+	}
+
+	function seekFromKey(event: KeyboardEvent) {
+		if ($replayClock.mode === 'live') return;
+		const frame = 1 / Math.max(1, $replayClock.frameRate);
+		const span = $replayClock.end - $replayClock.start;
+		const page = Math.max(frame, span / 20);
+		const delta =
+			event.key === 'ArrowLeft'
+				? -frame
+				: event.key === 'ArrowRight'
+					? frame
+					: event.key === 'PageDown'
+						? -page
+						: event.key === 'PageUp'
+							? page
+							: 0;
+		if (event.key === 'Home') seekReplay($replayClock.start);
+		else if (event.key === 'End') seekReplay($replayClock.end);
+		else if (delta !== 0) seekReplay($replayClock.playhead + delta);
+		else return;
+		event.preventDefault();
+	}
+
 	const fetchTick = $derived(Math.floor(now / FETCH_THROTTLE_SEC));
 
 	// Annotations
@@ -100,32 +138,6 @@
 		$timeConductorState;
 		fetchTick;
 		if (!proj) return;
-		if (proj.id === 'gallery') {
-			const { start, end } = getTimeBounds($timeConductorState, Date.now() / 1000);
-			const span = Math.max(1, end - start);
-			annotations = [
-				{
-					id: 'gallery-launch',
-					ts: start + span * 0.18,
-					label: 'Launch',
-					details: 'Motor ignition'
-				},
-				{
-					id: 'gallery-apogee',
-					ts: start + span * 0.47,
-					label: 'Apogee',
-					details: 'Max altitude reached'
-				},
-				{
-					id: 'gallery-deploy',
-					ts: start + span * 0.52,
-					label: 'Deploy',
-					details: 'Parachute deployment'
-				},
-				{ id: 'gallery-landing', ts: start + span * 0.78, label: 'Landing', details: 'Touchdown' }
-			];
-			return;
-		}
 		const { start, end } = getTimeBounds($timeConductorState, Date.now() / 1000);
 		fetch(`/api/projects/${proj.id}/annotations?from=${start}&to=${end}`)
 			.then((r) => (r.ok ? r.json() : []))
@@ -143,17 +155,8 @@
 		const proj = $currentProject;
 		$timeConductorState;
 		fetchTick;
-		if (!proj || proj.id === 'gallery') {
-			if (proj?.id === 'gallery') {
-				const { start, end } = getTimeBounds($timeConductorState, Date.now() / 1000);
-				const span = Math.max(1, end - start);
-				limitEvents = [
-					{ id: 'gallery-lim1', ts: start + span * 0.32, label: 'TEMP > 80C', severity: 'yellow' },
-					{ id: 'gallery-lim2', ts: start + span * 0.61, label: 'BATT < 3.2V', severity: 'red' }
-				];
-			} else {
-				limitEvents = [];
-			}
+		if (!proj) {
+			limitEvents = [];
 			return;
 		}
 		const { start, end } = getTimeBounds($timeConductorState, Date.now() / 1000);
@@ -164,7 +167,19 @@
 </script>
 
 <div class="timeline-strip" class:full={variant === 'full'}>
-	<div class="track">
+	<div
+		class="track"
+		class:scrubbable={$replayClock.mode !== 'live'}
+		role="slider"
+		aria-disabled={$replayClock.mode === 'live' ? 'true' : 'false'}
+		aria-label={$replayClock.mode === 'live' ? undefined : 'Replay position'}
+		aria-valuemin={$replayClock.mode === 'live' ? undefined : $replayClock.start}
+		aria-valuemax={$replayClock.mode === 'live' ? undefined : $replayClock.end}
+		aria-valuenow={$replayClock.mode === 'live' ? undefined : $replayClock.playhead}
+		tabindex="0"
+		onpointerdown={seekFromPointer}
+		onkeydown={seekFromKey}
+	>
 		<!-- Notch ticks with time labels -->
 		{#each notches as n}
 			<span class="notch" style="left: {n.pos}%" aria-hidden="true">
@@ -175,6 +190,10 @@
 		<!-- Live "now" cursor (realtime mode only) -->
 		{#if nowPct !== null}
 			<span class="now-cursor" style="left: {nowPct}%" aria-label="Now"></span>
+		{/if}
+		{#if playheadPct !== null}
+			<span class="playhead-cursor" style="left: {playheadPct}%" aria-label="Replay position"
+			></span>
 		{/if}
 
 		{#if showAnnotations && (source === 'all' || source === 'annotations')}
@@ -225,6 +244,9 @@
 		width: 100%;
 		overflow: hidden;
 	}
+	.track.scrubbable {
+		cursor: ew-resize;
+	}
 	.notch {
 		position: absolute;
 		top: 0;
@@ -266,6 +288,16 @@
 		border-radius: 1px;
 		box-shadow: 0 0 4px var(--mcs-accent);
 	}
+	.playhead-cursor {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 2px;
+		background: var(--mcs-text);
+		transform: translateX(-50%);
+		pointer-events: none;
+		z-index: 2;
+	}
 	.marker {
 		position: absolute;
 		top: 0;
@@ -298,9 +330,9 @@
 		opacity: 1;
 	}
 	.limit-marker.limit-red {
-		background: #ef4444;
+		background: var(--mcs-danger, #222222);
 	}
 	.limit-marker.limit-yellow {
-		background: #f59e0b;
+		background: var(--mcs-warning, #777777);
 	}
 </style>
