@@ -159,40 +159,65 @@ export function getStreamSamples(
 	}
 
 	const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-	const limitSql = typeof limit === 'number' && limit > 0 ? 'LIMIT ?' : '';
-	if (limitSql) {
-		params.push(limit);
+	const limited = typeof limit === 'number' && limit > 0;
+	type Row = { id: number; event_ts: number; received_at: number; payload: string };
+
+	// A bounded window with more samples than the limit is reduced to the
+	// minimum and maximum of each time bucket. Truncating instead would show
+	// only the start of the window and could drop peaks such as apogee.
+	if (limited && typeof from === 'number' && typeof to === 'number' && to > from) {
+		const { count } = db
+			.prepare(`SELECT COUNT(*) AS count FROM telemetry_history ${whereSql}`)
+			.get(...params) as { count: number };
+		if (count > limit) {
+			const buckets = Math.max(1, Math.floor(limit / 2));
+			const width = (to - from) / buckets;
+			const bucketSql = (aggregate: 'MIN' | 'MAX') =>
+				`SELECT id, event_ts, received_at, payload, ${aggregate}(json_extract(payload, '$.value')) AS v
+				 FROM telemetry_history ${whereSql} GROUP BY CAST((event_ts - ?) / ? AS INTEGER)`;
+			const rows = db
+				.prepare(
+					`SELECT id, event_ts, received_at, payload FROM (${bucketSql('MIN')} UNION ${bucketSql('MAX')})
+					 ORDER BY event_ts, id`
+				)
+				.all(...params, from, width, ...params, from, width) as Row[];
+			return rows.map((row) => toStreamSample(row, includeEventIds, includeReceivedAt));
+		}
 	}
 
-	// With no time range, a limit means the newest samples for live-view seeding.
-	// Restore chronological order after the descending database query.
-	const newestLimitedWindow = Boolean(limitSql && from === undefined && to === undefined);
+	if (limited) params.push(limit);
+	const limitSql = limited ? 'LIMIT ?' : '';
+
+	// Unless both bounds are given, a limit means the newest samples (live
+	// seeding, or the last value before a playhead). Restore chronological
+	// order after the descending query.
+	const newestLimitedWindow = limited && (from === undefined || to === undefined);
 	const orderSql = newestLimitedWindow ? 'ORDER BY event_ts DESC' : 'ORDER BY event_ts ASC';
 	const sql = `SELECT id, event_ts, received_at, payload FROM telemetry_history ${whereSql} ${orderSql}, id ${limitSql}`;
-	const rows = db.prepare(sql).all(...params) as {
-		id: number;
-		event_ts: number;
-		received_at: number;
-		payload: string;
-	}[];
+	const rows = db.prepare(sql).all(...params) as Row[];
 	if (newestLimitedWindow) rows.reverse();
+	return rows.map((row) => toStreamSample(row, includeEventIds, includeReceivedAt));
+}
 
-	return rows.map((row) => {
-		let payload: Record<string, unknown>;
-		try {
-			payload = JSON.parse(row.payload) as Record<string, unknown>;
-		} catch {
-			payload = {};
-		}
-		const value = extractNumericValue(payload) ?? NaN;
-		return {
-			...payload,
-			timestamp: row.event_ts,
-			value,
-			...(includeEventIds ? { eventId: row.id } : {}),
-			...(includeReceivedAt ? { receivedAt: row.received_at } : {})
-		};
-	});
+function toStreamSample(
+	row: { id: number; event_ts: number; received_at: number; payload: string },
+	includeEventIds: boolean,
+	includeReceivedAt: boolean
+): StreamSample {
+	let payload: Record<string, unknown>;
+	try {
+		payload = JSON.parse(row.payload) as Record<string, unknown>;
+	} catch {
+		payload = {};
+	}
+	const value = extractNumericValue(payload) ?? NaN;
+	return {
+		...payload,
+		timestamp: row.event_ts,
+		value,
+		...(includeEventIds ? { eventId: row.id } : {}),
+		...(includeReceivedAt ? { receivedAt: row.received_at } : {})
+	};
 }
 
 /** Read newly ingested stream events in durable arrival order for live catch-up. */

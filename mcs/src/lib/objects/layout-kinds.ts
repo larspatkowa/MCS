@@ -1,6 +1,12 @@
 import type { ObjectType } from './types.js';
 
-export const LAYOUT_OBJECT_TYPES = ['layout', 'flex-layout', 'grid-layout', 'stack'] as const;
+export const LAYOUT_OBJECT_TYPES = [
+	'layout',
+	'flex-layout',
+	'grid-layout',
+	'stack',
+	'tabs'
+] as const;
 
 export type LayoutObjectType = (typeof LAYOUT_OBJECT_TYPES)[number];
 

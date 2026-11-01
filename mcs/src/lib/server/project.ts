@@ -29,6 +29,8 @@ const MANIFEST_FILENAME = 'project.json';
 // Cache of project ID -> normalized project path so repeated API calls
 // during a refresh don't need to rescan all recentProjectPaths on disk.
 const projectIdPathCache = new Map<string, string>();
+const projectIdVerifiedAt = new Map<string, number>();
+const MANIFEST_RECHECK_MS = 2_000;
 
 function normalizeProjectPath(path: string): string {
 	return resolve(path);
@@ -116,11 +118,18 @@ export function getProjectPathById(id: string): string | null {
 	// the project was moved or deleted.
 	const cachedPath = projectIdPathCache.get(id);
 	if (cachedPath) {
+		// Ingest resolves the project on every request; re-reading the manifest
+		// from disk each time dominated small-request cost.
+		const verifiedAt = projectIdVerifiedAt.get(id) ?? 0;
+		if (Date.now() - verifiedAt < MANIFEST_RECHECK_MS) return cachedPath;
 		const normalizedCachedPath = normalizeProjectPath(cachedPath);
 		const manifest = readManifest(normalizedCachedPath);
 		if (manifest?.id === id) {
+			projectIdPathCache.set(id, normalizedCachedPath);
+			projectIdVerifiedAt.set(id, Date.now());
 			return normalizedCachedPath;
 		}
+		projectIdVerifiedAt.delete(id);
 		// Stale cache entry; drop it and fall through to full scan.
 		projectIdPathCache.delete(id);
 	}
@@ -135,6 +144,7 @@ export function getProjectPathById(id: string): string | null {
 		const manifest = readManifest(normalizedPath);
 		if (manifest?.id === id) {
 			projectIdPathCache.set(id, normalizedPath);
+			projectIdVerifiedAt.set(id, Date.now());
 			return normalizedPath;
 		}
 	}
@@ -144,4 +154,5 @@ export function getProjectPathById(id: string): string | null {
 /** Drop cached path for a project id (e.g. after delete or when recents change). */
 export function forgetProjectIdCache(id: string): void {
 	projectIdPathCache.delete(id);
+	projectIdVerifiedAt.delete(id);
 }

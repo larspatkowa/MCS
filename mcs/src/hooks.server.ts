@@ -90,6 +90,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 		}
 
+		// MCP tools check project access per call, so a token only needs to be valid here.
+		if (path === '/api/mcp' && !user) {
+			const bearer = event.request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+			event.locals.serviceTokenProjectId = projectForApiToken(bearer);
+		}
+
 		if (!user && !event.locals.serviceTokenProjectId) return authFailure(isApi, path);
 		if (user && projectId) {
 			const role = getProjectRole(user.id, projectId);

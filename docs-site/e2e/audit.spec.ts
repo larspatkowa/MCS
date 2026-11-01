@@ -13,6 +13,9 @@ const pages = [
   { path: "/api/objects", title: "Objects API | MCS Documentation" },
   { path: "/api/streams", title: "Streams API | MCS Documentation" },
   { path: "/api/runs", title: "Runs API | MCS Documentation" },
+  { path: "/components/mission-views", title: "Mission views | MCS Documentation" },
+  { path: "/guides/agents", title: "AI agents (MCP) | MCS Documentation" },
+  { path: "/guides/open-mct", title: "Compared with Open MCT | MCS Documentation" },
 ];
 
 for (const { path, title } of pages) {

@@ -10,7 +10,9 @@
 		formatValue,
 		SERIES_COLORS,
 		nearestByX,
-		splitAtGaps
+		splitAtGaps,
+		parseSeriesSource,
+		seriesValue
 	} from '$lib/charts/chart-utils.js';
 	import ErrorBoundary from '../ErrorBoundary.svelte';
 	import { timeConductorState } from '$lib/stores/timeline.js';
@@ -45,6 +47,10 @@
 
 	// Units come from the plot's own props first, then from stream metadata.
 	let streamUnits = $state<Record<string, string>>({});
+	let streamLabels = $state<Record<string, string>>({});
+	const legendNames = $derived(
+		dataSources.map((source: string, i: number) => seriesNames[i] || streamLabels[source] || source)
+	);
 	const seriesUnits = $derived(
 		dataSources.map((src: string, i: number) => props.units?.[i] || streamUnits[src] || '')
 	);
@@ -105,10 +111,13 @@
 		const runReplayActive = Boolean($replayRunId);
 		allSeries = dataSources.map((src: string) => {
 			if (runReplayActive) {
-				const replayPoints = replaySamplesForStream(src, { to: $replayClock.playhead }) ?? [];
+				const { streamId, field } = parseSeriesSource(src);
+				const replayPoints = replaySamplesForStream(streamId, { to: $replayClock.playhead }) ?? [];
 				// Saved runs can hold far more samples than the plot has pixels.
 				return decimate(
-					replayPoints.map((point) => ({ timestamp: point.timestamp, value: point.value })),
+					replayPoints
+						.map((point) => ({ timestamp: point.timestamp, value: seriesValue(point, field) }))
+						.filter((point) => Number.isFinite(point.value)),
 					MAX_RENDER_PTS
 				);
 			}
@@ -129,15 +138,6 @@
 		}, 50);
 	}
 
-	function numericValue(values: Record<string, unknown>): number {
-		if (values.value !== undefined) return Number(values.value);
-		return (
-			Object.values(values)
-				.map(Number)
-				.find((value) => !isNaN(value)) ?? NaN
-		);
-	}
-
 	async function refreshLiveBuffers(
 		projectId: string,
 		sources: string[],
@@ -150,7 +150,7 @@
 					const existing = liveBuffer[source] ?? [];
 					const afterEventId = latestEventIdBySource[source];
 					const points = (
-						await fetchStreamSamples(projectId, source, {
+						await fetchStreamSamples(projectId, parseSeriesSource(source).streamId, {
 							afterEventId,
 							includeEventIds: afterEventId === undefined,
 							limit: afterEventId === undefined ? LIVE_MAX_PTS : LIVE_INCREMENTAL_MAX_PTS
@@ -158,7 +158,7 @@
 					)
 						.map((sample) => ({
 							timestamp: sample.timestamp,
-							value: typeof sample.value === 'number' ? sample.value : NaN,
+							value: seriesValue(sample, parseSeriesSource(source).field),
 							...(sample.eventId === undefined ? {} : { eventId: sample.eventId })
 						}))
 						.filter((point) => !isNaN(point.value));
@@ -307,7 +307,7 @@
 		hoverX !== null ? (tooltipOnRight ? hoverX + ML + 10 : hoverX + ML - TOOLTIP_W - 10) : 0
 	);
 	const tooltipRows = $derived(
-		(seriesNames.length ? seriesNames : dataSources).map((name: string, i: number) => ({
+		legendNames.map((name: string, i: number) => ({
 			name: name || `Series ${i + 1}`,
 			val: hoverValues[i],
 			unit: seriesUnits[i] ?? '',
@@ -382,7 +382,8 @@
 
 		const unsubs: (() => void)[] = [];
 		for (const src of sources) {
-			const unsub = subscribeSSE(proj.id, src, (event) => {
+			const { streamId, field } = parseSeriesSource(src);
+			const unsub = subscribeSSE(proj.id, streamId, (event) => {
 				if (!('values' in event)) return;
 				const samples = event.samples ?? [
 					{
@@ -393,7 +394,7 @@
 				];
 				const incoming: Pt[] = [];
 				for (const sample of samples) {
-					const value = numericValue(sample.values);
+					const value = seriesValue(sample.values, field);
 					if (!isNaN(value)) {
 						incoming.push({
 							timestamp: sample.timestamp,
@@ -430,7 +431,7 @@
 			Promise.all(
 				sources.map(async (source: string) => {
 					const points = (
-						await fetchStreamSamples(proj.id, source, {
+						await fetchStreamSamples(proj.id, parseSeriesSource(source).streamId, {
 							from: state.fixedStart,
 							to: state.fixedEnd,
 							limit: 5000,
@@ -439,7 +440,7 @@
 					)
 						.map((sample) => ({
 							timestamp: sample.timestamp,
-							value: typeof sample.value === 'number' ? sample.value : NaN,
+							value: seriesValue(sample, parseSeriesSource(source).field),
 							...(sample.eventId === undefined ? {} : { eventId: sample.eventId })
 						}))
 						.filter((point) => Number.isFinite(point.value));
@@ -506,11 +507,24 @@
 			.then((response) => (response.ok ? response.json() : []))
 			.then((list: { id: string; metadata?: Record<string, unknown> }[]) => {
 				const units: Record<string, string> = {};
-				for (const stream of list) {
-					const unit = stream.metadata?.units ?? stream.metadata?.unit;
-					if (typeof unit === 'string' && unit) units[stream.id] = unit;
+				const labels: Record<string, string> = {};
+				for (const source of dataSources) {
+					const { streamId, field } = parseSeriesSource(source);
+					const metadata = list.find((stream) => stream.id === streamId)?.metadata;
+					const declared = metadata?.units ?? metadata?.unit;
+					// Units are one string for the stream, or a map from field to unit.
+					const unit =
+						typeof declared === 'string'
+							? declared
+							: declared && typeof declared === 'object'
+								? (declared as Record<string, unknown>)[field ?? 'value']
+								: undefined;
+					if (typeof unit === 'string' && unit) units[source] = unit;
+					const name = typeof metadata?.name === 'string' ? metadata.name : streamId;
+					labels[source] = field ? `${name} · ${field}` : name;
 				}
 				streamUnits = units;
+				streamLabels = labels;
 			})
 			.catch(() => {
 				// Without metadata every series stays on the left axis.
@@ -927,7 +941,7 @@
 			<!-- Legend -->
 			{#if allSeries.length > 1}
 				<div class="legend" bind:clientHeight={legendH}>
-					{#each seriesNames.length ? seriesNames : dataSources as name, i}
+					{#each legendNames as name, i}
 						<span class="legend-item">
 							<svg width="18" height="10" style="overflow:visible;flex-shrink:0">
 								<line

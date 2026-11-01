@@ -9,7 +9,15 @@ export type BuiltInObjectType =
 	| 'telemetry-table'
 	| 'markdown-note'
 	| 'image'
-	| 'video-stream';
+	| 'video-stream'
+	| 'values-table'
+	| 'mission-clock'
+	| 'event-log'
+	| 'ground-track'
+	| 'scatter-plot'
+	| 'tabs'
+	| 'stack'
+	| 'web-page';
 
 /** Stored projects may contain older object ids, so the database boundary is intentionally open. */
 export type ObjectType = BuiltInObjectType | (string & {});
@@ -164,6 +172,65 @@ export interface ImageProps {
 	assetId?: string;
 	label?: string;
 	fit?: 'contain' | 'cover';
+}
+
+/** Newest value of each field of the chosen streams (Open MCT's LAD table). */
+export interface ValuesTableProps {
+	dataSources?: string[];
+	/** Comma-separated field names to show; empty shows every field. */
+	fields?: string;
+	precision?: number;
+	/** Seconds without a new sample before a row is marked stale. */
+	staleAfterSec?: number;
+}
+
+export interface MissionClockProps {
+	label?: string;
+	/** Launch time in Unix seconds, or null when no count is running. */
+	t0?: number | null;
+	/** Seconds remaining when the count is held. */
+	heldSeconds?: number | null;
+	showControls?: boolean;
+}
+
+export interface EventLogProps {
+	lookbackHours?: number;
+	showNotes?: boolean;
+}
+
+export interface GroundTrackProps {
+	dataSource?: string;
+	latField?: string;
+	lonField?: string;
+	altField?: string;
+	/** Launch site; defaults to the first fix in the window. */
+	padLat?: number;
+	padLon?: number;
+	windowSec?: number;
+}
+
+export interface ScatterPlotProps {
+	xSource?: string;
+	xField?: string;
+	/** Defaults to the X stream. */
+	ySource?: string;
+	yField?: string;
+	xLabel?: string;
+	yLabel?: string;
+	windowSec?: number;
+	connect?: boolean;
+}
+
+export type TabsProps = Record<string, never>;
+
+export interface StackProps {
+	minRowHeight?: number;
+	showTitles?: boolean;
+}
+
+export interface WebPageProps {
+	url?: string;
+	label?: string;
 }
 
 export interface MCSObject extends MCSObjectBase {

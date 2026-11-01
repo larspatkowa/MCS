@@ -28,12 +28,16 @@ export interface SSECheckpointEvent {
 export interface SSELimitEvent {
 	type: 'limit';
 	event: {
+		id: string;
+		runId: string | null;
 		streamId: string;
 		field: string;
-		level: string;
+		ts: number;
 		value: number;
-		threshold: number;
-		timestamp: number;
+		severity: 'yellow' | 'red';
+		label: string;
+		ackedAt: string | null;
+		createdAt: string;
 	};
 }
 

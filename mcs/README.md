@@ -16,6 +16,27 @@ npm run dev
 Open <http://127.0.0.1:5173>. The server listens on loopback by default. A
 project is created only after an explicit action.
 
+## Views
+
+Line plots (several fields and units per plot), scatter plots, gauges, a
+values table with limits and staleness, a telemetry table, an alarm log with
+acknowledgement and operator notes, a mission clock (T−/T+ with hold), an
+offline GPS ground track, images and video, Markdown notes and embedded web
+pages. Grid, flex, tabs and stack layouts arrange them. Plot one field of a
+multi-field stream as `stream#field`.
+
+## AI agents
+
+`/api/mcp` is a Model Context Protocol server with tools to read telemetry,
+compute peaks, handle alarms, control recording and build displays. It follows
+the same project access rules as the REST API.
+
+```bash
+claude mcp add --transport http mcs http://127.0.0.1:5173/api/mcp
+```
+
+Clients that only speak stdio can run `node bin/mcs.js mcp --url http://127.0.0.1:5173`.
+
 ## Data boundary
 
 Suppliers own capture hardware, device clocks, and raw recording. They send

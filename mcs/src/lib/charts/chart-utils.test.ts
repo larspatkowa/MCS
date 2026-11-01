@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatTimestamp, splitAtGaps } from './chart-utils.js';
+import { formatTimestamp, parseSeriesSource, seriesValue, splitAtGaps } from './chart-utils.js';
 import { formatDateTime } from '../date-time-format.js';
 
 const at = (timestamps: number[]) => timestamps.map((timestamp) => ({ timestamp }));
@@ -38,5 +38,19 @@ describe('UTC time display', () => {
 	it('marks UTC clock readings explicitly', () => {
 		const text = formatDateTime(new Date(t * 1000), { utc: true }, 'en-GB');
 		expect(text).toBe('2026/10/31 23:48:20 UTC');
+	});
+});
+
+describe('series sources', () => {
+	it('selects one field of a multi-field stream', () => {
+		expect(parseSeriesSource('vehicle:state#vel')).toEqual({
+			streamId: 'vehicle:state',
+			field: 'vel'
+		});
+		expect(parseSeriesSource('engine:chamber')).toEqual({ streamId: 'engine:chamber' });
+		expect(seriesValue({ alt: 10, vel: 3 }, 'vel')).toBe(3);
+		expect(seriesValue({ alt: 10, vel: 3 })).toBe(10);
+		expect(seriesValue({ value: 7, alt: 1 })).toBe(7);
+		expect(seriesValue({ alt: 'n/a' }, 'alt')).toBeNaN();
 	});
 });

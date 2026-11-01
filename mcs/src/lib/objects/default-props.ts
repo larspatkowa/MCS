@@ -25,7 +25,8 @@ export function getDefaultPropsForType(type: string): Record<string, unknown> {
 				showGrid: true,
 				pollInterval: 1000,
 				xAxis: { label: 'UTC time' },
-				yAxis: { label: 'Value' }
+				// An empty label lets the axis show the series unit.
+				yAxis: { label: '' }
 			};
 		case 'gauge':
 			return {
@@ -60,6 +61,37 @@ export function getDefaultPropsForType(type: string): Record<string, unknown> {
 				controls: true,
 				volume: 1
 			};
+		case 'values-table':
+			return { dataSources: [], fields: '', precision: 3, staleAfterSec: 5 };
+		case 'mission-clock':
+			return { label: 'Mission clock', t0: null, heldSeconds: null, showControls: true };
+		case 'event-log':
+			return { lookbackHours: 24, showNotes: true };
+		case 'ground-track':
+			return {
+				dataSource: '',
+				latField: 'lat',
+				lonField: 'lon',
+				altField: 'alt',
+				padLat: null,
+				padLon: null,
+				windowSec: 3600
+			};
+		case 'scatter-plot':
+			return {
+				xSource: '',
+				xField: 'value',
+				ySource: '',
+				yField: 'value',
+				windowSec: 600,
+				connect: true
+			};
+		case 'tabs':
+			return {};
+		case 'stack':
+			return { minRowHeight: 180, showTitles: true };
+		case 'web-page':
+			return { url: '', label: '' };
 		default:
 			// Legacy object types remain readable as unknown objects, but are not
 			// creatable and receive no feature-specific defaults.

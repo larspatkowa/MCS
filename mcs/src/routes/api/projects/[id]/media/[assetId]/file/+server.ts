@@ -6,6 +6,10 @@ import { getProjectPathById } from '$lib/server/project.js';
 import { apiErrorResponse } from '$lib/server/errors.js';
 import * as mediaDb from '$lib/server/media-db.js';
 
+// The stored MIME type is supplied by the uploader. Only media the player can
+// render is served inline; anything else (HTML, SVG, scripts) is downloaded.
+const INLINE_MEDIA_TYPES = /^(video|audio)\/[a-z0-9.+-]+$|^image\/(png|jpeg|gif|webp|avif)$/i;
+
 export const GET: RequestHandler = ({ params, request }) => {
 	const projectPath = getProjectPathById(params.id);
 	if (!projectPath) return apiErrorResponse('Project not found', 404);
@@ -15,11 +19,15 @@ export const GET: RequestHandler = ({ params, request }) => {
 		const path = mediaDb.getMediaAssetPath(projectPath, asset.id);
 		const size = statSync(path).size;
 		const range = request.headers.get('range');
+		const inline = INLINE_MEDIA_TYPES.test(asset.mimeType);
 		const headers = new Headers({
-			'content-type': asset.mimeType,
+			'content-type': inline ? asset.mimeType : 'application/octet-stream',
 			'accept-ranges': 'bytes',
-			'cache-control': 'public, max-age=31536000, immutable'
+			'cache-control': 'private, max-age=31536000, immutable',
+			'x-content-type-options': 'nosniff',
+			'content-security-policy': "sandbox; default-src 'none'"
 		});
+		if (!inline) headers.set('content-disposition', 'attachment');
 		if (!range) {
 			headers.set('content-length', String(size));
 			return new Response(Readable.toWeb(createReadStream(path)) as ReadableStream, { headers });

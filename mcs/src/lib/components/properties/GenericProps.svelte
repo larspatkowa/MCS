@@ -13,7 +13,7 @@
 
 	let { object }: { object: MCSObject } = $props();
 
-	let projectStreams = $state<{ id: string; name: string }[]>([]);
+	let projectStreams = $state<{ id: string; name: string; fields: string[] }[]>([]);
 
 	$effect(() => {
 		const project = $currentProject;
@@ -21,12 +21,25 @@
 		const controller = new AbortController();
 		fetch(`/api/projects/${project.id}/streams`, { signal: controller.signal })
 			.then((response) => (response.ok ? response.json() : []))
-			.then((list: { id: string; name?: string; metadata?: { name?: string } }[]) => {
-				projectStreams = list.map((stream) => ({
-					id: stream.id,
-					name: stream.metadata?.name ?? stream.name ?? stream.id
-				}));
-			})
+			.then(
+				(
+					list: {
+						id: string;
+						name?: string;
+						metadata?: { name?: string; units?: unknown };
+					}[]
+				) => {
+					projectStreams = list.map((stream) => ({
+						id: stream.id,
+						name: stream.metadata?.name ?? stream.name ?? stream.id,
+						// A per-field unit map also declares the stream's fields.
+						fields:
+							stream.metadata?.units && typeof stream.metadata.units === 'object'
+								? Object.keys(stream.metadata.units)
+								: []
+					}));
+				}
+			)
 			.catch(() => {
 				if (!controller.signal.aborted) projectStreams = [];
 			});
@@ -37,6 +50,16 @@
 		{ value: '', label: '(none)' },
 		...projectStreams.map((stream) => ({ value: stream.id, label: stream.name }))
 	]);
+	// Plots can draw one field of a multi-field stream as `stream#field`.
+	const seriesOptions = $derived(
+		projectStreams.flatMap((stream) => [
+			{ value: stream.id, label: stream.name },
+			...stream.fields.map((field) => ({
+				value: `${stream.id}#${field}`,
+				label: `${stream.name} · ${field}`
+			}))
+		])
+	);
 
 	const LABELS: Record<string, string> = {
 		dataSource: 'Data source',
@@ -70,7 +93,27 @@
 		tickStep: 'Tick step',
 		tickCount: 'Tick count',
 		tickLabelPrecision: 'Tick decimal places',
-		content: 'Content'
+		content: 'Content',
+		fields: 'Fields',
+		staleAfterSec: 'Stale after (s)',
+		showControls: 'Show count controls',
+		lookbackHours: 'Look back (hours)',
+		showNotes: 'Show operator notes',
+		latField: 'Latitude field',
+		lonField: 'Longitude field',
+		altField: 'Altitude field',
+		padLat: 'Pad latitude',
+		padLon: 'Pad longitude',
+		xSource: 'X stream',
+		xField: 'X field',
+		ySource: 'Y stream',
+		yField: 'Y field',
+		xLabel: 'X axis title',
+		yLabel: 'Y axis title',
+		connect: 'Connect points',
+		minRowHeight: 'Minimum row height (px)',
+		showTitles: 'Show titles',
+		url: 'Address'
 	};
 
 	const DESCRIPTIONS: Record<string, string> = {
@@ -87,8 +130,21 @@
 		interpolation: 'How adjacent samples are connected.',
 		windowSec: 'Live plot window in seconds.',
 		rowLimit: 'Maximum rows kept in the table.',
-		content: 'Markdown content saved in this note.'
+		content: 'Markdown content saved in this note.',
+		fields: 'Comma-separated payload fields to list. Leave empty to list every field.',
+		staleAfterSec: 'Rows with no new sample for this long are marked stale.',
+		lookbackHours: 'How far back alarms and notes are listed.',
+		padLat: 'Launch site latitude in decimal degrees. Empty uses the first GPS fix.',
+		padLon: 'Launch site longitude in decimal degrees. Empty uses the first GPS fix.',
+		ySource: 'Leave empty to read the Y field from the X stream.',
+		minRowHeight: 'Rows grow to fill the view and scroll below this height.',
+		url: 'An http or https page shown in a sandbox without access to MCS.'
 	};
+
+	// Optional numbers start empty, so they cannot be inferred from the stored value.
+	const OPTIONAL_NUMBER_KEYS = new Set(['padLat', 'padLon']);
+	// Written by the view itself, not edited by hand.
+	const VIEW_STATE_KEYS = new Set(['t0', 'heldSeconds']);
 
 	const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
 		displayType: [
@@ -118,7 +174,7 @@
 	};
 
 	function isStreamField(key: string): boolean {
-		return key === 'dataSource' || key === 'streamId';
+		return key === 'dataSource' || key === 'streamId' || key === 'xSource' || key === 'ySource';
 	}
 
 	function isColorField(key: string): boolean {
@@ -138,6 +194,8 @@
 		| 'textarea'
 		| 'text'
 		| 'skip' {
+		if (VIEW_STATE_KEYS.has(key)) return 'skip';
+		if (OPTIONAL_NUMBER_KEYS.has(key)) return 'number';
 		if (key === 'dataSources') return 'multisource';
 		if (key === 'content' || (typeof value === 'string' && value.length > 120)) return 'textarea';
 		if (SELECT_OPTIONS[key]) return 'select';
@@ -217,7 +275,7 @@
 			{:else if entry.editorType === 'multisource'}
 				<PropMultiStream
 					values={Array.isArray(entry.value) ? (entry.value as string[]) : []}
-					options={streamOptions}
+					options={object.type === 'line-plot' ? seriesOptions : streamOptions.slice(1)}
 					onChange={(value) => updateProp(entry.key, value)}
 				/>
 			{:else if entry.editorType === 'stream'}
@@ -239,7 +297,8 @@
 			{:else if entry.editorType === 'number'}
 				<PropNumber
 					value={entry.value as number | undefined}
-					onChange={(value) => updateProp(entry.key, value ?? 0)}
+					onChange={(value) =>
+						updateProp(entry.key, value ?? (OPTIONAL_NUMBER_KEYS.has(entry.key) ? null : 0))}
 				/>
 			{:else if entry.editorType === 'textarea'}
 				<PropTextarea

@@ -14,7 +14,15 @@ import {
 	Table,
 	FileText,
 	Image as ImageIcon,
-	Video
+	Video,
+	ListOrdered,
+	Timer,
+	Siren,
+	MapPin,
+	ScatterChart,
+	PanelTop,
+	Rows3,
+	Globe
 } from '@lucide/svelte';
 import ProjectProps from '$lib/components/properties/ProjectProps.svelte';
 import FolderProps from '$lib/components/properties/FolderProps.svelte';
@@ -51,11 +59,34 @@ function bootstrapTypes(): void {
 			group: 'Containers',
 			creatable: true
 		},
+		{ typeId: 'tabs', label: 'Tabs', icon: PanelTop, group: 'Containers', creatable: true },
+		{ typeId: 'stack', label: 'Stack', icon: Rows3, group: 'Containers', creatable: true },
 		{ typeId: 'project', label: 'Project', icon: FolderOpen, group: 'Root', creatable: false },
 		// Charts
 		{ typeId: 'line-plot', label: 'Line Plot', icon: ChartLine, group: 'Charts', creatable: true },
+		{
+			typeId: 'scatter-plot',
+			label: 'Scatter Plot',
+			icon: ScatterChart,
+			group: 'Charts',
+			creatable: true
+		},
+		{
+			typeId: 'ground-track',
+			label: 'Ground Track',
+			icon: MapPin,
+			group: 'Charts',
+			creatable: true
+		},
 		// Instruments
 		{ typeId: 'gauge', label: 'Gauge', icon: Gauge, group: 'Instruments', creatable: true },
+		{
+			typeId: 'mission-clock',
+			label: 'Mission Clock',
+			icon: Timer,
+			group: 'Instruments',
+			creatable: true
+		},
 		// Data views
 		{
 			typeId: 'telemetry-table',
@@ -64,6 +95,14 @@ function bootstrapTypes(): void {
 			group: 'Data',
 			creatable: true
 		},
+		{
+			typeId: 'values-table',
+			label: 'Values Table',
+			icon: ListOrdered,
+			group: 'Data',
+			creatable: true
+		},
+		{ typeId: 'event-log', label: 'Alarms & Log', icon: Siren, group: 'Data', creatable: true },
 		// Content
 		{
 			typeId: 'markdown-note',
@@ -74,7 +113,8 @@ function bootstrapTypes(): void {
 		},
 		// Media
 		{ typeId: 'image', label: 'Image', icon: ImageIcon, group: 'Media', creatable: true },
-		{ typeId: 'video-stream', label: 'Video', icon: Video, group: 'Media', creatable: true }
+		{ typeId: 'video-stream', label: 'Video', icon: Video, group: 'Media', creatable: true },
+		{ typeId: 'web-page', label: 'Web Page', icon: Globe, group: 'Content', creatable: true }
 	];
 
 	for (const { typeId, label, icon, group, creatable } of builtIn) {
@@ -129,6 +169,41 @@ function bootstrapViews(): void {
 	);
 }
 
+function bootstrapNewViews(): void {
+	registerView(
+		'values-table',
+		lazy(() => import('$lib/components/center/ValuesTableView.svelte'))
+	);
+	registerView(
+		'mission-clock',
+		lazy(() => import('$lib/components/center/MissionClockView.svelte'))
+	);
+	registerView(
+		'event-log',
+		lazy(() => import('$lib/components/center/EventLogView.svelte'))
+	);
+	registerView(
+		'ground-track',
+		lazy(() => import('$lib/components/center/GroundTrackView.svelte'))
+	);
+	registerView(
+		'scatter-plot',
+		lazy(() => import('$lib/components/center/ScatterPlotView.svelte'))
+	);
+	registerView(
+		'tabs',
+		lazy(() => import('$lib/components/center/TabsView.svelte'))
+	);
+	registerView(
+		'stack',
+		lazy(() => import('$lib/components/center/StackView.svelte'))
+	);
+	registerView(
+		'web-page',
+		lazy(() => import('$lib/components/center/WebPageView.svelte'))
+	);
+}
+
 function bootstrapPropertyEditors(): void {
 	registerPropertyEditor('project', ProjectProps);
 	registerPropertyEditor('folder', FolderProps);
@@ -141,5 +216,6 @@ function bootstrapPropertyEditors(): void {
 export function bootstrapObjectTypes(): void {
 	bootstrapTypes();
 	bootstrapViews();
+	bootstrapNewViews();
 	bootstrapPropertyEditors();
 }

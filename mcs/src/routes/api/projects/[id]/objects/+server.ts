@@ -30,7 +30,15 @@ const TYPE_LABELS: Record<string, string> = {
 	'line-plot': 'Line Plot',
 	'video-stream': 'Video Stream',
 	image: 'Image',
-	'markdown-note': 'Markdown Note'
+	'markdown-note': 'Markdown Note',
+	'values-table': 'Values Table',
+	'mission-clock': 'Mission Clock',
+	'event-log': 'Alarms & Log',
+	'ground-track': 'Ground Track',
+	'scatter-plot': 'Scatter Plot',
+	tabs: 'Tabs',
+	stack: 'Stack',
+	'web-page': 'Web Page'
 };
 
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -57,7 +65,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		if (!parent) return apiErrorResponse('Parent object not found', 404);
 		if (!canContainChildren(parent.type as ObjectType)) {
 			return apiErrorResponse(
-				'Only folders, layout objects (flex/grid/tab), and project root can contain objects',
+				'Only folders, layouts (grid, flex, tabs, stack), and the project root can contain objects',
 				400
 			);
 		}

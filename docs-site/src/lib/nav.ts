@@ -82,8 +82,14 @@ export const nav: NavSection[] = [
 			{
 				label: 'Telemetry table',
 				href: '/components/telemetry-table',
-				description: 'Read the latest values from selected streams.',
+				description: 'Scroll through recent samples from selected streams.',
 				keywords: 'data table fields sample live values'
+			},
+			{
+				label: 'Mission views',
+				href: '/components/mission-views',
+				description: 'Values table, alarms and log, mission clock, ground track, scatter, tabs and stack.',
+				keywords: 'lad latest values alarms acknowledge notebook log clock countdown t-minus gps map ground track scatter tabs stack web page'
 			},
 			{
 				label: 'Markdown note',
@@ -119,6 +125,18 @@ export const nav: NavSection[] = [
 				href: '/guides/derived-values',
 				description: 'Apply a bounded list of numeric transforms to samples.',
 				keywords: 'derivative integral transform moving average align resample'
+			},
+			{
+				label: 'AI agents (MCP)',
+				href: '/guides/agents',
+				description: 'Connect Claude or another MCP client to read telemetry and build displays.',
+				keywords: 'mcp model context protocol agent claude llm ai tools stdio http'
+			},
+			{
+				label: 'Compared with Open MCT',
+				href: '/guides/open-mct',
+				description: 'Feature comparison, logging rate, and using MCS as an Open MCT backend.',
+				keywords: 'open mct openmct nasa comparison parity features performance throughput'
 			},
 			{
 				label: 'Flight system starter',

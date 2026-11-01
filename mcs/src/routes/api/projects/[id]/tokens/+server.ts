@@ -9,8 +9,10 @@ import { getProjectPathById } from '$lib/server/project.js';
 import { handleApiError } from '$lib/server/errors.js';
 import { readJsonObject } from '$lib/server/ingest-validation.js';
 
-export const GET: RequestHandler = ({ params }) => {
+export const GET: RequestHandler = ({ params, locals }) => {
 	if (!getProjectPathById(params.id)) return json({ error: 'Project not found' }, { status: 404 });
+	if (!locals.authUser || locals.projectRole !== 'admin')
+		return json({ error: 'Project administrator access required' }, { status: 403 });
 	return json({ tokens: listProjectApiTokens(params.id) });
 };
 

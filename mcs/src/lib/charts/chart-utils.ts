@@ -242,3 +242,22 @@ export function arcPath(
 	const y2 = cy + r * Math.sin(er);
 	return `M${x1},${y1} A${r},${r},0,${large},${sweep},${x2},${y2}`;
 }
+
+/**
+ * A plot source is a stream id, optionally followed by `#field` to plot one
+ * field of a multi-field payload. Stream ids cannot contain `#`.
+ */
+export function parseSeriesSource(source: string): { streamId: string; field?: string } {
+	const hash = source.indexOf('#');
+	return hash === -1
+		? { streamId: source }
+		: { streamId: source.slice(0, hash), field: source.slice(hash + 1) || undefined };
+}
+
+/** The plotted number of a sample: the named field, else `value`, else the first number. */
+export function seriesValue(values: Record<string, unknown>, field?: string): number {
+	if (field) return typeof values[field] === 'number' ? (values[field] as number) : NaN;
+	if (typeof values.value === 'number') return values.value;
+	for (const value of Object.values(values)) if (typeof value === 'number') return value;
+	return NaN;
+}

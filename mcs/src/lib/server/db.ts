@@ -40,10 +40,36 @@ export function getDb(projectPath: string): Database.Database {
 		}
 		db = new Database(path);
 		db.pragma('journal_mode = WAL');
+		// In WAL mode NORMAL never corrupts the database; a power cut can lose
+		// only the last few commits, and it removes an fsync from every ingest.
+		db.pragma('synchronous = NORMAL');
+		db.pragma('busy_timeout = 5000');
 		db.pragma('foreign_keys = ON');
+		cacheStatements(db);
 		dbCache.set(path, db);
 	}
 	return db;
+}
+
+const MAX_CACHED_STATEMENTS = 512;
+
+/**
+ * Reuse compiled statements. Callers prepare SQL inline at every call, which
+ * recompiled the ingest statements on every request. No caller changes a
+ * statement's mode (pluck/raw/expand) or iterates one, so sharing is safe.
+ */
+function cacheStatements(db: Database.Database): void {
+	const prepare = db.prepare.bind(db);
+	const statements = new Map<string, Database.Statement>();
+	db.prepare = ((sql: string) => {
+		let statement = statements.get(sql);
+		if (!statement) {
+			if (statements.size >= MAX_CACHED_STATEMENTS) statements.clear();
+			statement = prepare(sql);
+			statements.set(sql, statement);
+		}
+		return statement;
+	}) as typeof db.prepare;
 }
 
 export function projectDbExists(projectPath: string): boolean {

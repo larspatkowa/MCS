@@ -3,6 +3,7 @@
 	import TimeConductor from '../timeline/TimeConductor.svelte';
 	import RunControls from './RunControls.svelte';
 	import SourceStatus from './SourceStatus.svelte';
+	import AlarmStatus from './AlarmStatus.svelte';
 	import { currentProject } from '$lib/stores/project';
 	import { userSettings, getEffectiveDateTimeOptions } from '$lib/stores/settings';
 	import { formatDateTime } from '$lib/date-time-format';
@@ -38,6 +39,7 @@
 			<RunControls />
 			<TimeConductor />
 			<SourceStatus />
+			<AlarmStatus />
 		{/if}
 	</div>
 	<div class="timeline-wrap">

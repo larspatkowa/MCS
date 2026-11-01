@@ -37,6 +37,7 @@ function printHelp() {
 	  mcs restore <backup-directory> <new-project-directory>
 	  mcs upgrade [directory]
 	  mcs update [directory]  (compatibility alias for upgrade)
+	  mcs mcp [--url <server>] [--token <project-token>]
 
 
 Examples:
@@ -47,6 +48,7 @@ Examples:
   mcs backup my-project
   mcs restore .mcs-backups/project-2026-09-25 my-project-restored
   mcs upgrade my-project
+  mcs mcp --url http://127.0.0.1:5173   (MCP over stdio for AI agents)
 `);
 }
 
@@ -637,6 +639,63 @@ async function restoreCommand(rawArgs) {
 	);
 }
 
+/**
+ * Bridge MCP stdio to a running server's /api/mcp endpoint. Agents that only
+ * speak stdio (most desktop clients) launch this; each JSON-RPC line is
+ * forwarded and the reply written back as one line.
+ */
+async function mcpCommand(rawArgs) {
+	const args = [...rawArgs];
+	const base = (
+		readOption(args, '--url') ??
+		process.env.MCS_URL ??
+		'http://127.0.0.1:5173'
+	).replace(/\/$/, '');
+	const token = readOption(args, '--token') ?? process.env.MCS_TOKEN;
+	ensureNoUnknownOptions(args);
+	const endpoint = `${base}/api/mcp`;
+	const headers = { 'content-type': 'application/json', accept: 'application/json' };
+	if (token) headers.authorization = `Bearer ${token}`;
+	const { createInterface } = await import('node:readline');
+	const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
+	let queue = Promise.resolve();
+	for await (const line of lines) {
+		if (!line.trim()) continue;
+		queue = queue.then(async () => {
+			let id = null;
+			try {
+				id = JSON.parse(line).id ?? null;
+			} catch {
+				// The server answers malformed JSON with a parse error.
+			}
+			try {
+				const response = await fetch(endpoint, { method: 'POST', headers, body: line });
+				if (response.status === 202) return;
+				const text = await response.text();
+				let body = null;
+				try {
+					body = JSON.parse(text);
+				} catch {
+					// Not JSON; reported below.
+				}
+				// Auth and other HTTP errors are plain {error} bodies, not JSON-RPC.
+				if (Array.isArray(body) || body?.jsonrpc === '2.0') {
+					process.stdout.write(`${JSON.stringify(body)}\n`);
+				} else {
+					throw new Error(body?.error ?? `HTTP ${response.status}`);
+				}
+			} catch (error) {
+				if (id === null) return;
+				const message = `MCS server at ${base} is unreachable or refused the request: ${error instanceof Error ? error.message : String(error)}`;
+				process.stdout.write(
+					`${JSON.stringify({ jsonrpc: '2.0', id, error: { code: -32000, message } })}\n`
+				);
+			}
+		});
+	}
+	await queue;
+}
+
 const [command = 'help', ...args] = process.argv.slice(2);
 
 try {
@@ -648,6 +707,7 @@ try {
 	else if (command === 'backup') await backupCommand(args);
 	else if (command === 'restore') await restoreCommand(args);
 	else if (command === 'upgrade' || command === 'update') upgradeCommand(args);
+	else if (command === 'mcp') await mcpCommand(args);
 	else throw new Error(`unknown command "${command}"; run mcs --help`);
 } catch (error) {
 	fail(error instanceof Error ? error.message : String(error));
