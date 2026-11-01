@@ -130,6 +130,24 @@ describe('MCP server', () => {
 		expect(call('list_projects', {}, other).structuredContent.items).toEqual([]);
 		const own: McpAccess = { user: null, tokenProjectId: id };
 		expect(call('get_latest', { projectId: id }, own).isError).toBe(false);
+		expect(
+			call(
+				'ingest',
+				{ projectId: id, samples: [{ streamId: 'x', timestamp: 1, values: { value: 1 } }] },
+				own
+			).isError
+		).toBe(false);
+		// A bridge token must not change displays, limits or recording.
+		for (const [name, args] of [
+			['create_object', { type: 'folder', name: 'x' }],
+			['set_limits', { streamId: 'x', redHigh: 1 }],
+			['control_recording', { action: 'start' }],
+			['acknowledge_alarm', { id: 'all' }]
+		] as const) {
+			const result = call(name, { projectId: id, ...args }, own);
+			expect(result.isError, name).toBe(true);
+			expect(result.content[0].text).toMatch(/read and ingest only/);
+		}
 	});
 
 	it('parses relative and absolute times', () => {

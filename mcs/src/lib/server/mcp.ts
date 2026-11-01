@@ -31,19 +31,35 @@ export interface McpAccess {
 
 class ToolError extends Error {}
 
-function can(access: McpAccess, projectId: string, write: boolean): boolean {
-	if (access.tokenProjectId) return access.tokenProjectId === projectId;
+/**
+ * read: view telemetry and displays. ingest: write samples. edit: change
+ * displays, limits, alarms and recording.
+ */
+type AccessLevel = 'read' | 'ingest' | 'edit';
+
+function can(access: McpAccess, projectId: string, level: AccessLevel): boolean {
+	// Project tokens are issued to acquisition bridges. Over REST they can only
+	// ingest; here they may also read that project, but never edit it.
+	if (access.tokenProjectId) return access.tokenProjectId === projectId && level !== 'edit';
 	if (!authenticationRequired()) return true;
 	if (!access.user) return false;
 	const role = getProjectRole(access.user.id, projectId);
-	return role !== null && (!write || role !== 'viewer');
+	return role !== null && (level === 'read' || role !== 'viewer');
 }
 
-function project(access: McpAccess, args: Record<string, unknown>, write = false): string {
+function project(
+	access: McpAccess,
+	args: Record<string, unknown>,
+	level: AccessLevel = 'read'
+): string {
 	const projectId = validateIdentifier(args.projectId, 'projectId');
-	if (!can(access, projectId, write)) {
+	if (!can(access, projectId, level)) {
 		throw new ToolError(
-			write ? 'Editor access to this project is required' : 'Project access denied'
+			level === 'read'
+				? 'Project access denied'
+				: access.tokenProjectId && level === 'edit'
+					? 'Project tokens can read and ingest only; this tool needs a signed-in editor'
+					: 'Editor access to this project is required'
 		);
 	}
 	const path = getProjectPathById(projectId);
@@ -329,7 +345,7 @@ const TOOLS: Tool[] = [
 		},
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
 		run: (args, access) => {
-			const path = project(access, args, true);
+			const path = project(access, args, 'edit');
 			if (args.id === 'all') return { acknowledged: limitsDb.ackAllLimitEvents(path) };
 			const id = validateIdentifier(args.id, 'id');
 			if (!limitsDb.ackLimitEvent(path, id)) throw new ToolError('Alarm not found');
@@ -357,7 +373,7 @@ const TOOLS: Tool[] = [
 		},
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
 		run: (args, access) => {
-			const path = project(access, args, true);
+			const path = project(access, args, 'edit');
 			const streamId = validateIdentifier(args.streamId, 'streamId');
 			const field = fieldName(args.field);
 			const bound = (value: unknown) =>
@@ -400,7 +416,7 @@ const TOOLS: Tool[] = [
 		},
 		annotations: { readOnlyHint: false, destructiveHint: false },
 		run: (args, access) => {
-			const path = project(access, args, true);
+			const path = project(access, args, 'edit');
 			if (args.action === 'start') {
 				return runsDb.startRun(path, typeof args.name === 'string' ? { name: args.name } : {});
 			}
@@ -429,7 +445,7 @@ const TOOLS: Tool[] = [
 		},
 		annotations: { readOnlyHint: false, destructiveHint: false },
 		run: (args, access) => {
-			const path = project(access, args, true);
+			const path = project(access, args, 'edit');
 			const text = String(args.text ?? '').trim();
 			if (!text || text.length > 500) throw new ToolError('text must be 1–500 characters');
 			const details = typeof args.details === 'string' ? args.details.slice(0, 16_384) : undefined;
@@ -468,7 +484,7 @@ const TOOLS: Tool[] = [
 		},
 		annotations: { readOnlyHint: false, destructiveHint: false },
 		run: (args, access) => {
-			project(access, args, true);
+			project(access, args, 'ingest');
 			if (!Array.isArray(args.samples)) throw new ToolError('samples must be an array');
 			const result = performIngestBatchDetailed(
 				String(args.projectId),
@@ -507,7 +523,7 @@ const TOOLS: Tool[] = [
 		},
 		annotations: { readOnlyHint: false, destructiveHint: false },
 		run: (args, access) => {
-			const path = project(access, args, true);
+			const path = project(access, args, 'edit');
 			const type = String(args.type);
 			if (!CREATABLE_TYPES.includes(type)) throw new ToolError(`Unknown type: ${type}`);
 			const tree = objectsDb.getObjectTree(path);
@@ -549,7 +565,7 @@ const TOOLS: Tool[] = [
 		},
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
 		run: (args, access) => {
-			const path = project(access, args, true);
+			const path = project(access, args, 'edit');
 			const objectId = validateIdentifier(args.objectId, 'objectId');
 			const existing = objectsDb.getObject(path, objectId);
 			if (!existing) throw new ToolError('Object not found');

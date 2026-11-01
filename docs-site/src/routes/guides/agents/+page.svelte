@@ -63,8 +63,9 @@
 		<p>
 			The MCP server follows the same rules as the REST API. In the default loopback mode without
 			accounts every local client has full access. With accounts enabled, send a project API token
-			as a bearer token. The agent then reaches only that project. A signed-in viewer can call the
-			read tools but not the ones that write.
+			as a bearer token. The agent then reaches only that project, and can read it and ingest
+			samples but not change displays, limits, alarms or recording; those tools need a signed-in
+			editor. A signed-in viewer can call only the read tools.
 		</p>
 		<CodeBlock lang="bash" title="Remote server with a project token" code={tokenConfig} />
 		<Callout type="warning" title="Agents can write">
