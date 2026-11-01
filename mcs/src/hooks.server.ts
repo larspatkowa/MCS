@@ -13,6 +13,7 @@ import {
 	startTelemetryRetentionCleanup,
 	stopTelemetryRetentionCleanup
 } from '$lib/server/retention.js';
+import { guardRequest, withSecurityHeaders } from '$lib/server/request-guard.js';
 import type { Handle } from '@sveltejs/kit';
 
 /**
@@ -41,7 +42,13 @@ if (process.env.NODE_ENV !== 'test') {
 	process.once('sveltekit:shutdown', (reason) => shutDown(String(reason)));
 }
 
-export const handle: Handle = async ({ event, resolve }) => {
+export const handle: Handle = async (input) => {
+	const refused = guardRequest(input.event.request, authenticationRequired());
+	if (refused) return withSecurityHeaders(refused);
+	return withSecurityHeaders(await handleRequest(input));
+};
+
+const handleRequest: Handle = async ({ event, resolve }) => {
 	// Log startup once
 	if (!started) {
 		started = true;

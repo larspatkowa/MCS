@@ -51,4 +51,15 @@ node mcs/bin/mcs.js open ./project --host 0.0.0.0 --allow-remote`;
 		<p>When authentication is enabled, send the project token as a Bearer token to <code>/api/ingest/v2</code>. Use one token per source where practical, and revoke it when that source no longer needs access.</p>
 		<p>See <a href="/api/access">health and access routes</a> for the account and token endpoints.</p>
 	</section>
+
+	<section>
+		<h2>Browser protection</h2>
+		<p>Every request passes the same checks before it reaches a route:</p>
+		<ul>
+			<li>A write whose <code>Origin</code> or <code>Sec-Fetch-Site</code> names another site is refused.</li>
+			<li>A write body must be <code>application/json</code> or <code>multipart/form-data</code>. Other types are the ones a web page can send to another site without asking first.</li>
+			<li>Without accounts, MCS answers only <code>localhost</code>, <code>*.localhost</code> and IP addresses in the <code>Host</code> header. This stops DNS rebinding, where a web page points its own domain at your machine. To reach a laptop by a name such as <code>groundstation.local</code>, list it: <code>MCS_ALLOWED_HOSTS=groundstation.local</code>.</li>
+			<li>Pages send a Content-Security-Policy that allows only MCS's own scripts and forbids framing MCS in another site.</li>
+		</ul>
+	</section>
 </article>
